@@ -481,7 +481,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         var kind = single ? item!.Kind : FileKind.Other;
         bool inFolder = !_active.IsDriveList;
 
-        Show(RbNewFolder, inFolder);
+        Show(RbNew, inFolder);
         Show(RbPaste, inFolder);
         RbPaste.IsEnabled = _canPaste;
         MenuPaste.IsEnabled = _canPaste;
