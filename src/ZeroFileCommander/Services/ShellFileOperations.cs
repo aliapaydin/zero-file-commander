@@ -43,6 +43,15 @@ public static class ShellFileOperations
     public static Task<bool> RecycleAsync(IntPtr owner, IEnumerable<string> sources) =>
         RunAsync(owner, FO_DELETE, sources, null, FOF_ALLOWUNDO);
 
+    /// <summary>
+    /// Kalıcı olarak siler (Geri Dönüşüm Kutusu'na gitmez). Yalnızca kullanıcı Shift ile
+    /// açıkça istediğinde ve onay verdikten sonra çağrılır.
+    /// </summary>
+    public static Task<bool> DeletePermanentlyAsync(IntPtr owner, IEnumerable<string> sources) =>
+        RunAsync(owner, FO_DELETE, sources, null, FOF_NOCONFIRMATION);
+
+    private const ushort FOF_NOCONFIRMATION = 0x0010;
+
     private static Task<bool> RunAsync(IntPtr owner, uint func, IEnumerable<string> sources, string? destination, ushort flags)
     {
         var from = string.Join('\0', sources) + "\0\0";

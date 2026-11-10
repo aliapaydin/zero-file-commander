@@ -24,6 +24,8 @@
             <KeyboardAccelerator Key="F7" Invoked="Accel_Invoked" />
             <KeyboardAccelerator Key="F8" Invoked="Accel_Invoked" />
             <KeyboardAccelerator Key="Delete" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="Delete" Modifiers="Shift" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="F8" Modifiers="Shift" Invoked="Accel_Invoked" />
             <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="Accel_Invoked" />
             <KeyboardAccelerator Key="X" Modifiers="Control" Invoked="Accel_Invoked" />
             <KeyboardAccelerator Key="V" Modifiers="Control" Invoked="Accel_Invoked" />
@@ -230,7 +232,7 @@
                 <AppBarButton x:Name="RbRename" Label="Yeniden adlandır" Tag="Rename" Click="Command_Click" ToolTipService.ToolTip="Yeniden adlandır (F2)">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE8AC;" /></AppBarButton.Icon>
                 </AppBarButton>
-                <AppBarButton x:Name="RbDelete" Label="Sil" Tag="Delete" Click="Command_Click" ToolTipService.ToolTip="Geri Dönüşüm Kutusu'na gönder (Del)">
+                <AppBarButton x:Name="RbDelete" Label="Sil" Tag="Delete" Click="Command_Click" ToolTipService.ToolTip="Geri Dönüşüm Kutusu'na gönder (Del) · Shift ile kalıcı sil">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE74D;" /></AppBarButton.Icon>
                 </AppBarButton>
                 <AppBarSeparator x:Name="RbSep2" />
@@ -315,7 +317,7 @@
                 <Button Tag="CopyToOther" Click="Command_Click" Style="{StaticResource AccentButtonStyle}">F5 Kopyala →</Button>
                 <Button Tag="MoveToOther" Click="Command_Click">F6 Taşı →</Button>
                 <Button Tag="NewFolder" Click="Command_Click">F7 Yeni klasör</Button>
-                <Button Tag="Delete" Click="Command_Click">F8 Sil</Button>
+                <Button Tag="Delete" Click="Command_Click" ToolTipService.ToolTip="Geri Dönüşüm Kutusu'na gönder · Shift ile kalıcı sil">F8 Sil</Button>
             </StackPanel>
 
             <Button

@@ -9,5 +9,5 @@
 ## Checklist
 - [ ] Builds locally (x64) and CI is green
 - [ ] No hard-coded colors (theme resources used)
-- [ ] No permanent deletes (Recycle Bin only)
+- [ ] Deletes use the Recycle Bin unless the user explicitly asks (Shift + confirmation)
 - [ ] Roadmap updated if a roadmap item is done

@@ -293,7 +293,7 @@ public sealed partial class FilePane : UserControl
             menu.PrimaryCommands.Add(MenuButton("Kopyala", "", PaneCommand.Copy, "Ctrl+C"));
             menu.PrimaryCommands.Add(MenuButton("Yapıştır", "", PaneCommand.Paste, "Ctrl+V", enabled: canPaste));
             menu.PrimaryCommands.Add(MenuButton("Yeniden adlandır", "", PaneCommand.Rename, "F2", enabled: single));
-            menu.PrimaryCommands.Add(MenuButton("Sil", "", PaneCommand.Delete, "Del"));
+            menu.PrimaryCommands.Add(MenuButton("Sil", "", PaneCommand.Delete, "Del · Shift+Del: kalıcı"));
 
             menu.SecondaryCommands.Add(MenuButton("Aç", "", PaneCommand.Open, "Enter"));
             if (!item.IsDirectory)

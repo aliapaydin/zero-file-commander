@@ -269,7 +269,8 @@ public sealed partial class MainWindow : Window, IPaneHost
                     await RenameAsync(pane, target);
                     break;
                 case PaneCommand.Delete:
-                    await DeleteAsync(pane, selection);
+                    // Shift basılıyken (Shift+Del, Shift+tık) kalıcı silme
+                    await DeleteAsync(pane, selection, permanent: IsDown(VirtualKey.Shift));
                     break;
                 case PaneCommand.CopyPath:
                     var paths = selection.Count > 0 ? selection.Select(i => i.FullPath) : new[] { pane.CurrentPath };
@@ -462,14 +463,27 @@ public sealed partial class MainWindow : Window, IPaneHost
         pane.SelectByName(name);
     }
 
-    private async Task DeleteAsync(FilePane pane, IReadOnlyList<FileItem> items)
+    private async Task DeleteAsync(FilePane pane, IReadOnlyList<FileItem> items, bool permanent)
     {
         if (items.Count == 0) return;
-        var title = items.Count == 1 ? $"\"{items[0].Name}\" silinsin mi?" : $"{items.Count} öğe silinsin mi?";
-        if (!await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, title, "Geri Dönüşüm Kutusu'na gönderilecek.", "Sil")) return;
+        var subject = items.Count == 1 ? $"\"{items[0].Name}\"" : $"{items.Count} öğe";
 
-        Preview.Stop();
-        await ShellFileOperations.RecycleAsync(Hwnd, items.Select(i => i.FullPath));
+        if (permanent)
+        {
+            if (!await Dialogs.ConfirmDangerAsync(Content.XamlRoot, DialogTheme,
+                    $"{subject} kalıcı olarak silinsin mi?",
+                    "Bu öğeler Geri Dönüşüm Kutusu'na gitmeyecek ve geri alınamayacak.",
+                    "Kalıcı olarak sil")) return;
+            Preview.Stop();
+            await ShellFileOperations.DeletePermanentlyAsync(Hwnd, items.Select(i => i.FullPath));
+        }
+        else
+        {
+            if (!await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, $"{subject} silinsin mi?",
+                    "Geri Dönüşüm Kutusu'na gönderilecek. Kalıcı silmek için Shift basılıyken sil.", "Sil")) return;
+            Preview.Stop();
+            await ShellFileOperations.RecycleAsync(Hwnd, items.Select(i => i.FullPath));
+        }
         pane.Refresh();
         if (string.Equals(Other.CurrentPath, pane.CurrentPath, StringComparison.OrdinalIgnoreCase)) Other.Refresh();
     }

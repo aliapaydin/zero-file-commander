@@ -37,6 +37,27 @@ public static class Dialogs
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
+    /// <summary>Geri alınamayan işlemler için kırmızı uyarılı onay; varsayılan düğme "Vazgeç".</summary>
+    public static async Task<bool> ConfirmDangerAsync(XamlRoot root, ElementTheme theme, string title, string message, string confirm)
+    {
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, MaxWidth = 440 };
+        panel.Children.Add(new FontIcon
+        {
+            Glyph = "\uE7BA",
+            FontSize = 28,
+            VerticalAlignment = VerticalAlignment.Top,
+            Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
+        });
+        panel.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 380 });
+
+        var dialog = Create(root, theme, title, panel, confirm, "Vazgeç", ContentDialogButton.Close);
+        var danger = new Style(typeof(Button));
+        danger.Setters.Add(new Setter(Control.BackgroundProperty, Application.Current.Resources["SystemFillColorCriticalBrush"]));
+        danger.Setters.Add(new Setter(Control.ForegroundProperty, new SolidColorBrush(Microsoft.UI.Colors.White)));
+        dialog.PrimaryButtonStyle = danger;
+        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+    }
+
     /// <summary>Tek satırlık metin ister; <paramref name="selectStem"/> uzantıyı seçim dışında bırakır.</summary>
     public static async Task<string?> InputAsync(XamlRoot root, ElementTheme theme, string title, string initial, string confirm, bool selectStem = false)
     {
@@ -211,6 +232,7 @@ public static class Dialogs
             ("F5 / F6", "Karşı panele kopyala / taşı"),
             ("F7", "Yeni klasör"),
             ("F8 / Del", "Geri Dönüşüm Kutusu'na gönder"),
+            ("Shift+Del", "Kalıcı olarak sil (onay ister)"),
             ("Ctrl+C / X / V", "Kopyala / kes / yapıştır"),
             ("Ctrl+Shift+C", "Yolu kopyala"),
             ("Alt+Enter", "Özellikler"),

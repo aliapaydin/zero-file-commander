@@ -18,7 +18,7 @@ Thanks for your interest in Zero File Commander! Contributions in English or Tur
 - Keep PRs focused, one feature or fix each.
 - UI strings are Turkish for now; code, identifiers and comments in English are preferred.
 - Use WinUI theme resources instead of hard-coded colors (see [docs/DESIGN.md](docs/DESIGN.md)).
-- File operations must never delete permanently; always use the Recycle Bin.
+- Deletes go to the Recycle Bin by default; permanent delete only via explicit Shift + confirmation.
 - Make sure the CI build passes.
 
 ## License
