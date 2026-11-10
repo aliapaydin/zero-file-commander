@@ -148,11 +148,32 @@ public sealed partial class MainWindow : Window, IPaneHost
         }
     }
 
+    private int _previewRequest;
+
     private async Task UpdatePreviewAsync(bool autoPlay)
     {
         if (!_settings.ShowPreviewPane) return;
         var item = _active.FocusedItem;
-        await Preview.ShowAsync(item is { IsEntry: true } ? item : null, autoPlay);
+        int request = ++_previewRequest;
+        var resolved = item is { IsEntry: true } ? await ResolvePreviewItemAsync(item) : null;
+        if (request != _previewRequest) return;
+        await Preview.ShowAsync(resolved, autoPlay);
+    }
+
+    /// <summary>Arşiv içindeki dosyayı önizleme için geçici klasöre çıkarır.</summary>
+    private static async Task<FileItem?> ResolvePreviewItemAsync(FileItem item)
+    {
+        if (!item.IsInArchive || item.IsDirectory) return item;
+        if ((item.Size ?? 0) > 64L * 1024 * 1024) return null;
+        try
+        {
+            var temp = await ArchiveService.ExtractToTempAsync(item);
+            return new FileItem { Name = item.Name, FullPath = temp, Size = item.Size, Modified = item.Modified };
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private void RootGrid_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
@@ -251,6 +272,21 @@ public sealed partial class MainWindow : Window, IPaneHost
         var focus = pane.FocusedItem is { IsEntry: true } f ? f : null;
         var target = focus ?? selection.FirstOrDefault();
 
+        if (pane.IsInArchive && command is PaneCommand.Rename or PaneCommand.NewFolder or PaneCommand.Cut
+                or PaneCommand.OpenTerminal or PaneCommand.RunAsAdmin or PaneCommand.MoveToOther or PaneCommand.Compress)
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Arşiv içinde yapılamıyor",
+                "Bu işlem ZIP'in içinde desteklenmiyor. Dosyaları önce karşı panele çıkarın (F5).");
+            return;
+        }
+
+        // Arşivdeki dosyalarla dış uygulamalar için önce geçici bir kopya çıkar.
+        async Task<string?> RealPathAsync(FileItem item)
+        {
+            if (!item.IsInArchive) return item.FullPath;
+            return item.IsDirectory ? null : await ArchiveService.ExtractToTempAsync(item);
+        }
+
         try
         {
             switch (command)
@@ -259,7 +295,7 @@ public sealed partial class MainWindow : Window, IPaneHost
                     if (pane.FocusedItem is { } open) pane.Open(open);
                     break;
                 case PaneCommand.OpenWith when target is { IsDirectory: false }:
-                    ShellActions.OpenWith(target.FullPath);
+                    if (await RealPathAsync(target) is { } openWithPath) ShellActions.OpenWith(openWithPath);
                     break;
                 case PaneCommand.Preview when target is not null:
                     if (target.IsDirectory) { pane.Open(target); break; }
@@ -269,7 +305,14 @@ public sealed partial class MainWindow : Window, IPaneHost
                     await ShowPreviewPaneAsync(target, autoPlay: true);
                     break;
                 case PaneCommand.Edit when target is { IsDirectory: false }:
-                    ShellActions.EditInNotepad(target.FullPath);
+                    if (await RealPathAsync(target) is { } editPath) ShellActions.EditInNotepad(editPath);
+                    break;
+                case PaneCommand.Copy when selection.Count > 0 && pane.IsInArchive:
+                    var tempFolder = Path.Combine(Path.GetTempPath(), "ZeroFileCommander", "clipboard", Guid.NewGuid().ToString("N")[..8]);
+                    Directory.CreateDirectory(tempFolder);
+                    await ArchiveService.ExtractAsync(selection, tempFolder, OverwriteMode.Overwrite);
+                    await ClipboardService.SetFilesAsync(Directory.EnumerateFileSystemEntries(tempFolder), cut: false);
+                    pane.ShowStatus($"{selection.Count} öğe arşivden kopyalandı");
                     break;
                 case PaneCommand.Cut when selection.Count > 0:
                 case PaneCommand.Copy when selection.Count > 0:
@@ -301,6 +344,10 @@ public sealed partial class MainWindow : Window, IPaneHost
                 case PaneCommand.MoveToOther:
                     await TransferAsync(pane, selection, move: true);
                     break;
+                case PaneCommand.Properties when target is { IsInArchive: true }:
+                    await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, target.Name,
+                        $"ZIP içinde · {(target.IsDirectory ? "Klasör" : target.SizeText)}\nDeğiştirilme: {target.ModifiedText}\nArşiv: {target.ArchivePath}");
+                    break;
                 case PaneCommand.Properties:
                     var subject = target ?? (pane.IsDriveList ? null : new FileItem
                     {
@@ -321,12 +368,24 @@ public sealed partial class MainWindow : Window, IPaneHost
                     var folder = target is { IsDirectory: true } ? target.FullPath : pane.CurrentPath;
                     if (folder.Length > 0) ShellActions.OpenTerminal(folder);
                     break;
+                case PaneCommand.ShowInExplorer when pane.IsInArchive:
+                    ShellActions.ShowInExplorer(pane.ArchiveFile!);
+                    break;
                 case PaneCommand.ShowInExplorer:
                     if (target is not null) ShellActions.ShowInExplorer(target.FullPath);
                     else if (!pane.IsDriveList) ShellActions.ShowInExplorer(pane.CurrentPath);
                     break;
                 case PaneCommand.RunAsAdmin when target is { IsDirectory: false }:
                     ShellActions.RunAsAdmin(target.FullPath);
+                    break;
+                case PaneCommand.Compress:
+                    await CompressAsync(pane, selection);
+                    break;
+                case PaneCommand.ExtractHere when target is { Kind: FileKind.Archive, IsInArchive: false }:
+                    await ExtractArchiveAsync(target, pane, pane);
+                    break;
+                case PaneCommand.ExtractToOther when target is { Kind: FileKind.Archive, IsInArchive: false }:
+                    await ExtractArchiveAsync(target, pane, pane == LeftPane ? RightPane : LeftPane);
                     break;
             }
         }
@@ -406,7 +465,36 @@ public sealed partial class MainWindow : Window, IPaneHost
             return;
         }
 
+        // Arşivden dışarı: çıkar
+        if (source.IsInArchive)
+        {
+            if (target.IsInArchive)
+            {
+                await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Desteklenmiyor", "Bir arşivden diğerine doğrudan kopyalanamıyor; önce bir klasöre çıkarın.");
+                return;
+            }
+            var mode = await AskOverwriteAsync(ArchiveService.CountConflicts(items, target.CurrentPath));
+            if (mode is null) return;
+            source.ShowStatus("Çıkarılıyor…");
+            int extracted = await ArchiveService.ExtractAsync(items, target.CurrentPath, mode.Value);
+            source.ShowStatus($"{extracted} dosya çıkarıldı");
+            target.Refresh();
+            return;
+        }
+
         var sources = items.Select(i => i.FullPath).ToList();
+
+        // Arşivin içine: ekle (taşımada kaynaklar sonra Geri Dönüşüm Kutusu'na)
+        if (target.IsInArchive)
+        {
+            target.ShowStatus("Arşive ekleniyor…");
+            await ArchiveService.AddAsync(target.ArchiveFile!, target.ArchiveInner, sources);
+            if (move) await ShellFileOperations.RecycleAsync(Hwnd, sources);
+            source.Refresh();
+            target.Refresh();
+            return;
+        }
+
         if (move) Preview.Stop(); // taşınan medya dosyası kilitli kalmasın
         _ = move
             ? await ShellFileOperations.MoveAsync(Hwnd, sources, target.CurrentPath)
@@ -416,9 +504,81 @@ public sealed partial class MainWindow : Window, IPaneHost
         target.Refresh();
     }
 
+    /// <summary>Çakışma varsa sorar: üzerine yaz / atla / vazgeç (null).</summary>
+    private async Task<OverwriteMode?> AskOverwriteAsync(int conflicts)
+    {
+        if (conflicts == 0) return OverwriteMode.Overwrite;
+        var dialog = Dialogs.Create(Content.XamlRoot, DialogTheme, "Bazı öğeler zaten var",
+            new TextBlock { Text = $"Hedefte aynı adlı {conflicts} öğe var. Ne yapılsın?", TextWrapping = TextWrapping.Wrap },
+            "Üzerine yaz", "Vazgeç", ContentDialogButton.Secondary);
+        dialog.SecondaryButtonText = "Var olanları atla";
+        return await dialog.ShowAsync() switch
+        {
+            ContentDialogResult.Primary => OverwriteMode.Overwrite,
+            ContentDialogResult.Secondary => OverwriteMode.Skip,
+            _ => null,
+        };
+    }
+
+    private async Task CompressAsync(FilePane pane, IReadOnlyList<FileItem> items)
+    {
+        if (items.Count == 0 || !pane.IsFileSystemFolder) return;
+        var baseName = items.Count == 1 ? Path.GetFileNameWithoutExtension(items[0].Name) : Path.GetFileName(pane.CurrentPath.TrimEnd('\'));
+        if (string.IsNullOrWhiteSpace(baseName)) baseName = "Arşiv";
+        var suggested = Path.GetFileName(ShellNew.UniquePath(Path.Combine(pane.CurrentPath, baseName + ".zip")));
+        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "ZIP olarak sıkıştır", suggested, "Sıkıştır", selectStem: true);
+        if (name is null) return;
+        if (!name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) name += ".zip";
+        var archive = Path.Combine(pane.CurrentPath, name);
+        if (File.Exists(archive))
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Dosya zaten var", $"{name} adında bir dosya var; başka bir ad seçin.");
+            return;
+        }
+
+        pane.ShowStatus($"{name} oluşturuluyor…");
+        try
+        {
+            await ArchiveService.CreateAsync(archive, items.Select(i => i.FullPath));
+        }
+        catch
+        {
+            try { if (File.Exists(archive)) File.Delete(archive); } catch { /* yarım arşivi temizlemeyi dene */ }
+            throw;
+        }
+        pane.Refresh();
+        pane.SelectByName(name);
+    }
+
+    private async Task ExtractArchiveAsync(FileItem archive, FilePane source, FilePane destination)
+    {
+        if (!destination.IsFileSystemFolder)
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Hedef seçilmedi", "Çıkarmak için hedef panelde bir klasör açın.");
+            return;
+        }
+        var folderName = Path.GetFileName(ShellNew.UniquePath(Path.Combine(destination.CurrentPath, Path.GetFileNameWithoutExtension(archive.Name))));
+        var target = Path.Combine(destination.CurrentPath, folderName);
+        Directory.CreateDirectory(target);
+        source.ShowStatus($"{archive.Name} çıkarılıyor…");
+        int count = await ArchiveService.ExtractAllAsync(archive.FullPath, target, OverwriteMode.Overwrite);
+        source.ShowStatus($"{count} dosya çıkarıldı → {folderName}");
+        destination.Refresh();
+        destination.SelectByName(folderName);
+    }
+
     public async Task DropFilesAsync(FilePane target, IReadOnlyList<string> paths, bool copy)
     {
         if (target.IsDriveList || paths.Count == 0) return;
+
+        if (target.IsInArchive)
+        {
+            SetActive(target);
+            target.ShowStatus("Arşive ekleniyor…");
+            await ArchiveService.AddAsync(target.ArchiveFile!, target.ArchiveInner, paths);
+            target.Refresh();
+            return;
+        }
 
         // Zaten bu klasörde olanları atla.
         var incoming = paths.Where(p => !string.Equals(Path.GetDirectoryName(p.TrimEnd('\\')), target.CurrentPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)).ToList();
@@ -440,6 +600,14 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (pane.IsDriveList) return;
         var files = await ClipboardService.GetFilesAsync();
         if (files is null) return;
+
+        if (pane.IsInArchive)
+        {
+            pane.ShowStatus("Arşive ekleniyor…");
+            await ArchiveService.AddAsync(pane.ArchiveFile!, pane.ArchiveInner, files.Paths);
+            pane.Refresh();
+            return;
+        }
 
         if (files.IsCut) Preview.Stop();
         bool ok = files.IsCut
@@ -474,7 +642,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private async Task NewFolderAsync(FilePane pane)
     {
-        if (pane.IsDriveList) return;
+        if (!pane.IsFileSystemFolder) return;
         var suggested = Path.GetFileName(ShellNew.UniquePath(Path.Combine(pane.CurrentPath, "Yeni klasör")));
         var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "Yeni klasör", suggested, "Oluştur");
         if (name is null) return;
@@ -487,6 +655,15 @@ public sealed partial class MainWindow : Window, IPaneHost
     {
         if (items.Count == 0) return;
         var subject = items.Count == 1 ? $"\"{items[0].Name}\"" : $"{items.Count} öğe";
+
+        if (pane.IsInArchive)
+        {
+            if (!await Dialogs.ConfirmDangerAsync(Content.XamlRoot, DialogTheme, $"{subject} arşivden silinsin mi?",
+                    "Arşivin içinden silinen öğeler Geri Dönüşüm Kutusu'na gitmez ve geri alınamaz.", "Arşivden sil")) return;
+            await ArchiveService.DeleteAsync(items);
+            pane.Refresh();
+            return;
+        }
 
         if (permanent)
         {
@@ -511,7 +688,7 @@ public sealed partial class MainWindow : Window, IPaneHost
     private async Task ShowPreviewPaneAsync(FileItem item, bool autoPlay)
     {
         if (!_settings.ShowPreviewPane) _settings.ShowPreviewPane = true;
-        await Preview.ShowAsync(item, autoPlay);
+        await Preview.ShowAsync(await ResolvePreviewItemAsync(item), autoPlay);
     }
 
     // ================================================================ Şerit
@@ -526,7 +703,9 @@ public sealed partial class MainWindow : Window, IPaneHost
         var kind = single ? item!.Kind : FileKind.Other;
         bool inFolder = !_active.IsDriveList;
 
-        Show(RbNew, inFolder);
+        Show(RbNew, _active.IsFileSystemFolder);
+        Show(RbCompress, any && _active.IsFileSystemFolder);
+        Show(RbExtract, single && kind == FileKind.Archive && !item!.IsInArchive);
         Show(RbPaste, inFolder);
         RbPaste.IsEnabled = _canPaste;
         MenuPaste.IsEnabled = _canPaste;
@@ -984,7 +1163,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     public async Task CreateNewAsync(FilePane pane, ShellNewEntry? entry)
     {
-        if (pane.IsDriveList) return;
+        if (!pane.IsFileSystemFolder) return;
         if (entry is null)
         {
             await NewFolderAsync(pane);

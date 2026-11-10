@@ -19,6 +19,14 @@ public sealed class FileItem : INotifyPropertyChanged
     public long? Size { get; set; }
     public DateTime? Modified { get; set; }
 
+    /// <summary>Öğe bir ZIP arşivinin içindeyse arşiv dosyasının yolu.</summary>
+    public string? ArchivePath { get; set; }
+
+    /// <summary>Arşiv içindeki tam ad ("klasor/dosya.txt", klasörlerde "/" ile biter).</summary>
+    public string? EntryName { get; set; }
+
+    public bool IsInArchive => ArchivePath is not null;
+
     /// <summary>Gerçek bir dosya ya da klasör mü ("..", sürücü değil).</summary>
     public bool IsEntry => !IsParent && !IsDrive;
 

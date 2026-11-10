@@ -21,6 +21,9 @@ public enum PaneCommand
     ShowInExplorer,
     RunAsAdmin,
     Edit,
+    Compress,
+    ExtractHere,
+    ExtractToOther,
 }
 
 /// <summary>Panelin komutları ve bırakılan dosyaları ilettiği ana pencere.</summary>

@@ -42,7 +42,7 @@ public static class ShellIcons
         else
         {
             var ext = Path.GetExtension(item.Name);
-            if (PerFile.Contains(ext))
+            if (PerFile.Contains(ext) && !item.IsInArchive)
             {
                 key = item.FullPath;
                 path = item.FullPath;

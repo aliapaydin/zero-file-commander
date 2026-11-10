@@ -70,6 +70,17 @@ public sealed partial class FilePane : UserControl
 
     public bool IsDriveList => CurrentPath.Length == 0;
 
+    /// <summary>Panel bir ZIP arşivinin içini gösteriyorsa arşiv dosyası.</summary>
+    public string? ArchiveFile { get; private set; }
+
+    /// <summary>Arşiv içindeki klasör ("" = kök, aksi halde "/" ile biter).</summary>
+    public string ArchiveInner { get; private set; } = string.Empty;
+
+    public bool IsInArchive => ArchiveFile is not null;
+
+    /// <summary>Gerçek bir dosya sistemi klasörü mü (sürücü listesi ya da arşiv değil).</summary>
+    public bool IsFileSystemFolder => !IsDriveList && !IsInArchive;
+
     public IPaneHost? Host { get; set; }
 
     /// <summary>Ayarlarda sekmelerin saklandığı anahtar ön eki ("Left" / "Right").</summary>
@@ -280,9 +291,27 @@ public sealed partial class FilePane : UserControl
         bool sameFolder = string.Equals(previous, path, StringComparison.OrdinalIgnoreCase) && Items.Count > 0;
 
         List<FileItem> loaded;
+        string? archive = null;
+        string inner = string.Empty;
         try
         {
-            loaded = path.Length == 0 ? LoadDrives() : LoadFolder(path, out path);
+            if (path.Length == 0)
+            {
+                loaded = LoadDrives();
+            }
+            else if (Directory.Exists(path))
+            {
+                loaded = LoadFolder(path, out path);
+            }
+            else if (ArchiveService.TrySplit(path, out archive, out inner))
+            {
+                loaded = ArchiveService.List(archive, inner);
+                path = ArchiveService.DisplayPath(archive, inner);
+            }
+            else
+            {
+                throw new DirectoryNotFoundException($"Klasör bulunamadı: {path}");
+            }
         }
         catch (Exception ex)
         {
@@ -307,6 +336,8 @@ public sealed partial class FilePane : UserControl
         }
 
         CurrentPath = path;
+        ArchiveFile = archive;
+        ArchiveInner = inner;
         _all = loaded;
         if (CurrentTab is { } tab)
         {
@@ -322,7 +353,8 @@ public sealed partial class FilePane : UserControl
             var reselect = Items.FirstOrDefault(i => !i.IsParent && string.Equals(i.FullPath.TrimEnd('\\'), previous.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
             FileList.SelectedItem = reselect ?? Items.FirstOrDefault();
             if (FileList.SelectedItem is not null) FileList.ScrollIntoView(FileList.SelectedItem);
-            Watch(path);
+            if (archive is null) Watch(path);
+            else StopWatching();
         }
 
         UpdateStatus();
@@ -381,8 +413,27 @@ public sealed partial class FilePane : UserControl
     {
         if (item.IsDirectory)
             Navigate(item.FullPath);
+        else if (item.IsInArchive)
+            _ = OpenArchiveEntryAsync(item);
+        else if (ArchiveService.IsArchive(item.FullPath))
+            Navigate(item.FullPath); // ZIP'e klasör gibi gir
         else
             ShellActions.Open(item.FullPath);
+    }
+
+    private async Task OpenArchiveEntryAsync(FileItem item)
+    {
+        try
+        {
+            StatusText.Text = $"{item.Name} çıkarılıyor…";
+            var temp = await ArchiveService.ExtractToTempAsync(item);
+            ShellActions.Open(temp);
+            UpdateStatus();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = ex.Message;
+        }
     }
 
     public void BeginEditPath()
@@ -541,6 +592,7 @@ public sealed partial class FilePane : UserControl
         int dirs = _all.Count(i => i.IsDirectory && !i.IsParent);
         int files = _all.Count(i => !i.IsDirectory);
         string text = IsDriveList ? $"{dirs} sürücü" : $"{dirs} klasör, {files} dosya";
+        if (IsInArchive) text = $"ZIP · {text}";
         if (_filter.Length > 0) text += $" · filtre: {Items.Count(i => !i.IsParent)} eşleşme";
         StatusText.Text = text;
     }
@@ -885,6 +937,16 @@ public sealed partial class FilePane : UserControl
             {
                 menu.SecondaryCommands.Add(MenuButton("Yönetici olarak çalıştır", "", PaneCommand.RunAsAdmin));
             }
+            if (item.Kind == FileKind.Archive && !item.IsInArchive && ArchiveService.IsArchive(item.FullPath))
+            {
+                menu.SecondaryCommands.Add(new AppBarSeparator());
+                menu.SecondaryCommands.Add(MenuButton("Buraya çıkar", "\uE8B7", PaneCommand.ExtractHere));
+                menu.SecondaryCommands.Add(MenuButton("Karşı panele çıkar", "\uE8DE", PaneCommand.ExtractToOther));
+            }
+            if (!item.IsInArchive && IsFileSystemFolder)
+            {
+                menu.SecondaryCommands.Add(MenuButton("ZIP olarak sıkıştır…", "\uF012", PaneCommand.Compress));
+            }
 
             menu.SecondaryCommands.Add(new AppBarSeparator());
             menu.SecondaryCommands.Add(MenuButton("Karşı panele kopyala", "", PaneCommand.CopyToOther, "F5"));
@@ -901,10 +963,10 @@ public sealed partial class FilePane : UserControl
         else
         {
             menu.PrimaryCommands.Add(MenuButton("Yapıştır", "", PaneCommand.Paste, "Ctrl+V", enabled: canPaste && !IsDriveList));
-            menu.PrimaryCommands.Add(MenuButton("Yeni klasör", "", PaneCommand.NewFolder, "F7", enabled: !IsDriveList));
+            menu.PrimaryCommands.Add(MenuButton("Yeni klasör", "\uE8F4", PaneCommand.NewFolder, "F7", enabled: IsFileSystemFolder));
             menu.PrimaryCommands.Add(MenuButton("Yenile", "", PaneCommand.Refresh, "Ctrl+R"));
 
-            if (!IsDriveList)
+            if (IsFileSystemFolder)
             {
                 var newButton = new AppBarButton { Label = "Yeni", Icon = new FontIcon { Glyph = "\uE710" } };
                 var newMenu = new MenuFlyout { Placement = FlyoutPlacementMode.RightEdgeAlignedTop, ShouldConstrainToRootBounds = true };
@@ -942,7 +1004,7 @@ public sealed partial class FilePane : UserControl
     private void List_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
     {
         HideHover();
-        var paths = e.Items.OfType<FileItem>().Where(i => i.IsEntry).Select(i => i.FullPath).ToList();
+        var paths = e.Items.OfType<FileItem>().Where(i => i.IsEntry && !i.IsInArchive).Select(i => i.FullPath).ToList();
         if (paths.Count == 0)
         {
             e.Cancel = true;
@@ -988,7 +1050,7 @@ public sealed partial class FilePane : UserControl
             return;
         }
 
-        bool copy = e.Modifiers.HasFlag(DragDropModifiers.Control);
+        bool copy = e.Modifiers.HasFlag(DragDropModifiers.Control) || IsInArchive;
         e.AcceptedOperation = copy ? DataPackageOperation.Copy : DataPackageOperation.Move;
         var folderName = Path.GetFileName(CurrentPath.TrimEnd('\\'));
         if (folderName.Length == 0) folderName = CurrentPath;
@@ -1006,7 +1068,7 @@ public sealed partial class FilePane : UserControl
         DropHint.Visibility = Visibility.Collapsed;
         if (Host is null || IsDriveList) return;
 
-        bool copy = e.Modifiers.HasFlag(DragDropModifiers.Control);
+        bool copy = e.Modifiers.HasFlag(DragDropModifiers.Control) || IsInArchive;
         var deferral = e.GetDeferral();
         List<string> paths;
         try
@@ -1040,7 +1102,7 @@ public sealed partial class FilePane : UserControl
     {
         var settings = AppSettings.Current;
         if (!settings.HoverPreview) return;
-        if ((sender as FrameworkElement)?.DataContext is not FileItem { IsEntry: true } item) return;
+        if ((sender as FrameworkElement)?.DataContext is not FileItem { IsEntry: true, IsInArchive: false } item) return;
         if (!FileKinds.SupportsHover(item.Kind)) return;
 
         _hoverItem = item;

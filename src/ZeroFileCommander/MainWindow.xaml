@@ -114,6 +114,12 @@
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8DE;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="ZIP olarak sıkıştır…" Tag="Compress" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xF012;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Arşivi buraya çıkar" Tag="ExtractHere" Click="Command_Click" />
+                <MenuFlyoutItem Text="Arşivi karşı panele çıkar" Tag="ExtractToOther" Click="Command_Click" />
+                <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Önizle" Tag="Preview" Click="Command_Click" KeyboardAcceleratorTextOverride="Space">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8FF;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
@@ -253,6 +259,12 @@
                 </AppBarButton>
                 <AppBarButton x:Name="RbMoveOther" Label="Karşıya taşı" Tag="MoveToOther" Click="Command_Click" ToolTipService.ToolTip="Karşı panele taşı (F6)">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE8DE;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbCompress" Label="Sıkıştır" Tag="Compress" Click="Command_Click" ToolTipService.ToolTip="ZIP olarak sıkıştır">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xF012;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbExtract" Label="Çıkar" Tag="ExtractToOther" Click="Command_Click" ToolTipService.ToolTip="Arşivi karşı panele çıkar">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8B7;" /></AppBarButton.Icon>
                 </AppBarButton>
                 <AppBarSeparator x:Name="RbSep3" />
                 <AppBarButton x:Name="RbPlay" Label="Çal" Tag="Play" Click="Command_Click">
