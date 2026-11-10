@@ -119,7 +119,7 @@ public static class FilePreview
             var options = new EnumerationOptions
             {
                 IgnoreInaccessible = true,
-                AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
+                AttributesToSkip = System.IO.FileAttributes.Hidden | System.IO.FileAttributes.System,
             };
             var dir = new DirectoryInfo(folder);
             foreach (var d in dir.EnumerateDirectories("*", options).OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase).Take(max))
