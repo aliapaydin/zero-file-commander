@@ -31,13 +31,13 @@ public static class Overlay
         dialog.Closed += (_, _) => Pop();
     }
 
-    private static void Push()
+    public static void Push()
     {
         _count++;
         Changed?.Invoke(null, EventArgs.Empty);
     }
 
-    private static void Pop()
+    public static void Pop()
     {
         _count = Math.Max(0, _count - 1);
         Changed?.Invoke(null, EventArgs.Empty);

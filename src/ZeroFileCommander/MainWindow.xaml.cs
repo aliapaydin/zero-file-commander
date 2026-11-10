@@ -31,6 +31,10 @@ public sealed partial class MainWindow : Window, IPaneHost
     private string? _lastCapturedUrl;
     private DateTime _drivesRefreshed = DateTime.MinValue;
     private readonly List<(string Root, Button Button)> _driveButtons = new();
+    private readonly List<string> _history = new();
+    private readonly Dictionary<FilePane, string> _lastPaths = new();
+    private List<(string NewPath, string OldPath)>? _lastRename;
+    private SearchWindow? _searchWindow;
 
     public MainWindow()
     {
@@ -96,6 +100,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         _settings.Changed += Settings_Changed;
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        _history.AddRange(_settings.GetString("Pane.History").Split('\n', StringSplitOptions.RemoveEmptyEntries));
         LeftPane.SettingsKey = "Left";
         RightPane.SettingsKey = "Right";
         LeftPane.Restore(Directory.Exists(_settings.LeftPath) ? _settings.LeftPath : home);
@@ -138,6 +143,11 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void Pane_SelectionChanged(object? sender, EventArgs e)
     {
+        if (sender is FilePane changed && (!_lastPaths.TryGetValue(changed, out var last) || last != changed.CurrentPath))
+        {
+            _lastPaths[changed] = changed.CurrentPath;
+            if (changed.IsFileSystemFolder) AddHistory(changed.CurrentPath);
+        }
         if (!ReferenceEquals(sender, _active)) return;
         HighlightActiveDrive(_active);
         UpdateRibbon();
@@ -178,6 +188,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void RootGrid_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (Palette.IsOpen) return; // palet kendi tuşlarını yönetir
         bool inText = FocusManager.GetFocusedElement(Content.XamlRoot) is TextBox;
 
         // Ctrl+Tab / Ctrl+Shift+Tab: aktif paneldeki sekmeler arasında geç.
@@ -225,6 +236,7 @@ public sealed partial class MainWindow : Window, IPaneHost
             VirtualKey.F4 => nameof(PaneCommand.Edit),
             VirtualKey.F5 => nameof(PaneCommand.CopyToOther),
             VirtualKey.F6 => nameof(PaneCommand.MoveToOther),
+            VirtualKey.F7 when sender.Modifiers.HasFlag(VirtualKeyModifiers.Menu) => "app:search",
             VirtualKey.F7 => nameof(PaneCommand.NewFolder),
             VirtualKey.F8 => nameof(PaneCommand.Delete),
             VirtualKey.Delete when !inText => nameof(PaneCommand.Delete),
@@ -240,9 +252,14 @@ public sealed partial class MainWindow : Window, IPaneHost
             VirtualKey.T when ctrl => "app:newtab",
             VirtualKey.W when ctrl => "app:closetab",
             VirtualKey.L when ctrl => "app:editpath",
+            VirtualKey.K when ctrl => "app:palette",
+            VirtualKey.P when ctrl && shift => "app:palette",
+            VirtualKey.M when ctrl => "app:batchrename",
+            VirtualKey.F when ctrl && shift => "app:search",
             _ => null,
         };
         if (tag is null) return;
+        if (Palette.IsOpen && tag != "app:palette") return;
         args.Handled = true;
         RunTag(tag);
     }
@@ -424,6 +441,12 @@ public sealed partial class MainWindow : Window, IPaneHost
             case "app:focusleft": SetActive(LeftPane); LeftPane.FocusList(); break;
             case "app:focusright": SetActive(RightPane); RightPane.FocusList(); break;
             case "app:resetlayout": ResetLayout(); break;
+            case "app:palette": OpenPalette(); break;
+            case "app:batchrename": await BatchRenameAsync(_active); break;
+            case "app:undorename": await UndoRenameAsync(); break;
+            case "app:search": OpenSearch(); break;
+            case "app:comparemark": await CompareAndMarkAsync(); break;
+            case "app:sync": await OpenSyncAsync(); break;
             case "app:newtab": _active.AddTab(); _active.FocusList(); break;
             case "app:closetab": _active.CloseCurrentTab(); _active.FocusList(); break;
             case "app:nexttab": _active.NextTab(1); _active.FocusList(); break;
@@ -1115,6 +1138,200 @@ public sealed partial class MainWindow : Window, IPaneHost
         _ => "Yerel disk",
     };
 
+    // ================================================================ Faz 2: güç araçları
+
+    private static readonly (string Tag, string Label, string Glyph, string Shortcut)[] PaletteCommands =
+    [
+        ("NewFolder", "Yeni klasör", "\uE8F4", "F7"),
+        ("Copy", "Kopyala", "\uE8C8", "Ctrl+C"),
+        ("Cut", "Kes", "\uE8C6", "Ctrl+X"),
+        ("Paste", "Yapıştır", "\uE77F", "Ctrl+V"),
+        ("Rename", "Yeniden adlandır", "\uE8AC", "F2"),
+        ("Delete", "Sil (Geri Dönüşüm Kutusu)", "\uE74D", "Del"),
+        ("CopyToOther", "Karşı panele kopyala", "\uE8C8", "F5"),
+        ("MoveToOther", "Karşı panele taşı", "\uE8DE", "F6"),
+        ("CopyPath", "Yolu kopyala", "\uE71B", "Ctrl+Shift+C"),
+        ("Properties", "Özellikler", "\uE946", "Alt+Enter"),
+        ("OpenTerminal", "Terminalde aç", "\uE756", ""),
+        ("ShowInExplorer", "Dosya Gezgini'nde göster", "\uE838", ""),
+        ("Compress", "ZIP olarak sıkıştır", "\uF012", ""),
+        ("ExtractToOther", "Arşivi karşı panele çıkar", "\uE8B7", ""),
+        ("Refresh", "Yenile", "\uE72C", "Ctrl+R"),
+        ("app:batchrename", "Toplu yeniden adlandır", "\uE8AC", "Ctrl+M"),
+        ("app:search", "Ara", "\uE721", "Alt+F7"),
+        ("app:comparemark", "Klasörleri karşılaştır (farkları işaretle)", "\uE8FD", ""),
+        ("app:sync", "Klasör senkronizasyonu", "\uE895", ""),
+        ("app:newtab", "Yeni sekme", "\uEC6C", "Ctrl+T"),
+        ("app:closetab", "Sekmeyi kapat", "\uE711", "Ctrl+W"),
+        ("app:editpath", "Yolu düzenle", "\uE70F", "Ctrl+L"),
+        ("app:swap", "Panelleri değiştir", "\uE8AB", ""),
+        ("app:samefolder", "Panelleri eşitle", "\uE895", ""),
+        ("app:selectall", "Tümünü seç", "\uE8B3", "Ctrl+A"),
+        ("app:selectpattern", "Desenle seç", "\uE71C", "Num +"),
+        ("app:invert", "Seçimi tersine çevir", "\uE8B3", "Num *"),
+        ("app:preview", "Önizleme panelini aç/kapat", "\uE8FF", "Ctrl+Q"),
+        ("app:tree", "Klasör ağacını aç/kapat", "\uE8A4", "Ctrl+Shift+E"),
+        ("app:drives", "Sürücü çubuğunu aç/kapat", "\uEDA2", ""),
+        ("app:ribbon", "Şeridi aç/kapat", "\uE8A0", ""),
+        ("app:theme:0", "Tema: sisteme göre", "\uE790", ""),
+        ("app:theme:1", "Tema: aydınlık", "\uE706", ""),
+        ("app:theme:2", "Tema: karanlık", "\uE708", ""),
+        ("app:downloads", "İndirmeler", "\uE896", "Ctrl+J"),
+        ("app:settings", "Ayarlar", "\uE713", "Ctrl+,"),
+        ("app:resetlayout", "Panel yerleşimini sıfırla", "\uE7A7", ""),
+        ("app:shortcuts", "Klavye kısayolları", "\uE765", "F1"),
+        ("app:about", "Hakkında", "\uE946", ""),
+        ("app:hide", "Tepsiye gizle", "\uE921", ""),
+        ("app:exit", "Çıkış", "\uE7E8", ""),
+    ];
+
+    private void OpenPalette()
+    {
+        var pane = _active;
+        Palette.Open(() =>
+        {
+            var items = new List<PaletteItem>();
+            foreach (var (tag, label, glyph, shortcut) in PaletteCommands)
+            {
+                var captured = tag;
+                items.Add(new PaletteItem { Title = label, Subtitle = "Komut", Glyph = glyph, Shortcut = shortcut, Group = PaletteGroup.Command, Run = () => RunTag(captured) });
+            }
+            foreach (var folder in _history)
+            {
+                var path = folder;
+                var name = Path.GetFileName(path.TrimEnd('\\'));
+                items.Add(new PaletteItem
+                {
+                    Title = name.Length == 0 ? path : name,
+                    Subtitle = path,
+                    Glyph = "\uE8B7",
+                    Group = PaletteGroup.Folder,
+                    Run = () => { pane.Navigate(path); pane.FocusList(); },
+                });
+            }
+            foreach (var (root, _) in _driveButtons)
+            {
+                var path = root;
+                items.Add(new PaletteItem { Title = path.TrimEnd('\\'), Subtitle = "Sürücü", Glyph = "\uEDA2", Group = PaletteGroup.Folder, Run = () => { pane.Navigate(path); pane.FocusList(); } });
+            }
+            foreach (var entry in pane.Entries)
+            {
+                var name = entry.Name;
+                items.Add(new PaletteItem
+                {
+                    Title = name,
+                    Subtitle = entry.IsDirectory ? "Bu klasörde · klasör" : $"Bu klasörde · {entry.SizeText}",
+                    Glyph = entry.Glyph,
+                    Group = PaletteGroup.File,
+                    Run = () => { pane.SelectByName(name); pane.FocusList(); },
+                });
+            }
+            return items;
+        });
+    }
+
+    private async Task BatchRenameAsync(FilePane pane)
+    {
+        if (!pane.IsFileSystemFolder) return;
+        var items = pane.SelectedItems;
+        if (items.Count == 0) items = pane.Entries.Where(i => !i.IsDirectory).ToList();
+        if (items.Count == 0) return;
+
+        var view = new BatchRenameView(items);
+        var dialog = Dialogs.Create(Content.XamlRoot, DialogTheme, $"Toplu yeniden adlandır · {items.Count} öğe", view,
+            "Yeniden adlandır", "Vazgeç", ContentDialogButton.Primary);
+        dialog.Resources["ContentDialogMaxWidth"] = 1000.0;
+        dialog.IsPrimaryButtonEnabled = view.CanApply;
+        view.Changed += (_, _) => dialog.IsPrimaryButtonEnabled = view.CanApply;
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        Preview.Stop();
+        try
+        {
+            _lastRename = BatchRename.Apply(view.Rows);
+            MenuUndoRename.IsEnabled = _lastRename.Count > 0;
+            pane.ShowStatus($"{_lastRename.Count} öğe yeniden adlandırıldı · Düzen → Geri al");
+        }
+        finally
+        {
+            pane.Refresh();
+            if (string.Equals(Other.CurrentPath, pane.CurrentPath, StringComparison.OrdinalIgnoreCase)) Other.Refresh();
+        }
+    }
+
+    private async Task UndoRenameAsync()
+    {
+        if (_lastRename is null || _lastRename.Count == 0) return;
+        if (!await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, "Toplu adlandırma geri alınsın mı?",
+                $"{_lastRename.Count} öğe eski adına döndürülecek.", "Geri al")) return;
+        Preview.Stop();
+        BatchRename.Undo(_lastRename);
+        _lastRename = null;
+        MenuUndoRename.IsEnabled = false;
+        LeftPane.Refresh();
+        RightPane.Refresh();
+    }
+
+    /// <summary>İki paneldeki farkları işaretler: karşıda olmayan ya da daha yeni olanlar.</summary>
+    private async Task CompareAndMarkAsync()
+    {
+        if (!LeftPane.IsFileSystemFolder || !RightPane.IsFileSystemFolder)
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Karşılaştırılamıyor", "İki panelde de bir klasör açık olmalı.");
+            return;
+        }
+        var left = new Dictionary<string, FileItem>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in LeftPane.Entries) left.TryAdd(item.Name, item);
+        var right = new Dictionary<string, FileItem>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in RightPane.Entries) right.TryAdd(item.Name, item);
+
+        static bool Newer(FileItem a, FileItem? b) =>
+            b is null || (!a.IsDirectory && (a.Modified - b.Modified) > TimeSpan.FromSeconds(2))
+            || (!a.IsDirectory && a.Size != b.Size && a.Modified == b.Modified);
+
+        int l = LeftPane.SelectWhere(i => Newer(i, right.GetValueOrDefault(i.Name)));
+        int r = RightPane.SelectWhere(i => Newer(i, left.GetValueOrDefault(i.Name)));
+        LeftPane.ShowStatus(l == 0 ? "Fark yok" : $"{l} öğe karşıda yok ya da daha yeni");
+        RightPane.ShowStatus(r == 0 ? "Fark yok" : $"{r} öğe karşıda yok ya da daha yeni");
+        if (l + r == 0) Notifier.Show("Klasörler aynı", "İki panelde de fark bulunamadı.", "\uE8FB");
+    }
+
+    private async Task OpenSyncAsync()
+    {
+        if (!LeftPane.IsFileSystemFolder || !RightPane.IsFileSystemFolder)
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Senkronize edilemiyor", "İki panelde de bir klasör açık olmalı.");
+            return;
+        }
+        var window = new SyncWindow(LeftPane.CurrentPath, RightPane.CurrentPath);
+        window.Synced += (_, _) => { LeftPane.Refresh(); RightPane.Refresh(); };
+        window.Activate();
+    }
+
+    private void OpenSearch()
+    {
+        var folder = _active.IsFileSystemFolder ? _active.CurrentPath : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (_searchWindow is null)
+        {
+            _searchWindow = new SearchWindow(folder);
+            _searchWindow.Closed += (_, _) => _searchWindow = null;
+            _searchWindow.RevealRequested += (_, path) =>
+            {
+                var parent = Path.GetDirectoryName(path);
+                if (parent is null) return;
+                ShowFromTray();
+                _active.Navigate(parent);
+                _active.SelectByName(Path.GetFileName(path));
+                _active.FocusList();
+            };
+        }
+        else
+        {
+            _searchWindow.SetFolder(folder);
+        }
+        _searchWindow.Activate();
+    }
+
     // ================================================================ Yerleşim
 
     private void ResizePanes(double dx)
@@ -1146,8 +1363,16 @@ public sealed partial class MainWindow : Window, IPaneHost
         _settings.ResetLayout(); // Settings_Changed yeniden uygular
     }
 
+    private void AddHistory(string path)
+    {
+        _history.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+        _history.Insert(0, path);
+        if (_history.Count > 40) _history.RemoveRange(40, _history.Count - 40);
+    }
+
     private void SaveSession()
     {
+        _settings.SetString("Pane.History", string.Join('\n', _history));
         _placement.Save();
         LeftPane.Save();
         RightPane.Save();

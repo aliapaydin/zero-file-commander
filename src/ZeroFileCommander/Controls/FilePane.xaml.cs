@@ -378,6 +378,22 @@ public sealed partial class FilePane : UserControl
         FileList.ScrollIntoView(item);
     }
 
+    /// <summary>Koşula uyan öğeleri işaretler (önceki işaretler kalkar); işaretlenen sayıyı döner.</summary>
+    public int SelectWhere(Func<FileItem, bool> predicate)
+    {
+        FileList.SelectedItems.Clear();
+        int count = 0;
+        foreach (var item in Items.Where(i => i.IsEntry && predicate(i)))
+        {
+            FileList.SelectedItems.Add(item);
+            count++;
+        }
+        return count;
+    }
+
+    /// <summary>Panelde şu an listelenen gerçek öğeler.</summary>
+    public IReadOnlyList<FileItem> Entries => Items.Where(i => i.IsEntry).ToList();
+
     public void SelectAll(bool invert)
     {
         var current = new HashSet<FileItem>(FileList.SelectedItems.Cast<FileItem>());

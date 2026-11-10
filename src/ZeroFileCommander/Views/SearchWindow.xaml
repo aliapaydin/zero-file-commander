@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="ZeroFileCommander.Views.SearchWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:ZeroFileCommander.Models"
+    Title="Ara — Zero File Commander">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootGrid" RowDefinitions="40,Auto,*,Auto">
+        <Grid x:Name="TitleBarArea" Padding="14,0,0,0" ColumnSpacing="10" ColumnDefinitions="Auto,*">
+            <FontIcon Glyph="&#xE721;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+            <TextBlock Grid.Column="1" Text="Ara" VerticalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" />
+        </Grid>
+
+        <Grid Grid.Row="1" Padding="16,4,16,10" ColumnSpacing="12" RowSpacing="10" ColumnDefinitions="2*,*,*,Auto" RowDefinitions="Auto,Auto">
+            <TextBox x:Name="FolderBox" Header="Nerede" />
+            <TextBox x:Name="PatternBox" Grid.Column="1" Header="Dosya adı (*.pdf; rapor*)" Text="*" KeyDown="Box_KeyDown" />
+            <TextBox x:Name="ContentBox" Grid.Column="2" Header="İçinde geçen metin (isteğe bağlı)" KeyDown="Box_KeyDown" />
+            <Button x:Name="SearchButton" Grid.Column="3" VerticalAlignment="Bottom" Style="{StaticResource AccentButtonStyle}" Click="Search_Click">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon x:Name="SearchIcon" Glyph="&#xE721;" FontSize="14" />
+                    <TextBlock x:Name="SearchLabel" Text="Ara" />
+                </StackPanel>
+            </Button>
+            <StackPanel Grid.Row="1" Grid.ColumnSpan="4" Orientation="Horizontal" Spacing="16">
+                <CheckBox x:Name="RecursiveCheck" Content="Alt klasörler" IsChecked="True" />
+                <CheckBox x:Name="FoldersCheck" Content="Klasörleri de bul" />
+                <CheckBox x:Name="CaseCheck" Content="Büyük/küçük harf duyarlı (içerik)" />
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="2" Margin="16,0" CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+            <Grid RowDefinitions="Auto,*">
+                <Grid Padding="12,6" ColumnSpacing="12" ColumnDefinitions="24,*,2*,90,130" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <TextBlock Grid.Column="1" Text="Ad" Style="{StaticResource CaptionTextBlockStyle}" />
+                    <TextBlock Grid.Column="2" Text="Klasör" Style="{StaticResource CaptionTextBlockStyle}" />
+                    <TextBlock Grid.Column="3" Text="Boyut" HorizontalAlignment="Right" Style="{StaticResource CaptionTextBlockStyle}" />
+                    <TextBlock Grid.Column="4" Text="Değiştirilme" Style="{StaticResource CaptionTextBlockStyle}" />
+                </Grid>
+                <ListView
+                    x:Name="ResultList"
+                    Grid.Row="1"
+                    SelectionMode="Extended"
+                    IsDoubleTapEnabled="True"
+                    DoubleTapped="ResultList_DoubleTapped"
+                    KeyDown="ResultList_KeyDown"
+                    ItemsSource="{x:Bind Results}">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:FileItem">
+                            <Grid ColumnSpacing="12" ColumnDefinitions="24,*,2*,90,130">
+                                <FontIcon Glyph="{x:Bind Glyph}" FontSize="15" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                <TextBlock Grid.Column="1" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="{x:Bind EntryName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Column="3" Text="{x:Bind SizeText}" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+                                <TextBlock Grid.Column="4" Text="{x:Bind ModifiedText}" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="3" Padding="16,10,16,14" ColumnSpacing="12" ColumnDefinitions="*,Auto,Auto">
+            <TextBlock x:Name="StatusText" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+            <Button Grid.Column="1" Content="Panelde göster" Click="Reveal_Click" ToolTipService.ToolTip="Seçili sonucun klasörünü aktif panelde aç (Enter)" />
+            <Button Grid.Column="2" Content="Aç" Click="Open_Click" />
+        </Grid>
+    </Grid>
+</Window>

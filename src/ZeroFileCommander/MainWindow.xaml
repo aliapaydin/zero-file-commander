@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:ZeroFileCommander.Controls"
+    xmlns:views="using:ZeroFileCommander.Views"
     Title="Zero File Commander">
 
     <Window.SystemBackdrop>
@@ -39,6 +40,11 @@
             <KeyboardAccelerator Key="T" Modifiers="Control" Invoked="Accel_Invoked" />
             <KeyboardAccelerator Key="W" Modifiers="Control" Invoked="Accel_Invoked" />
             <KeyboardAccelerator Key="L" Modifiers="Control" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="K" Modifiers="Control" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="P" Modifiers="Control,Shift" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="M" Modifiers="Control" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="F7" Modifiers="Menu" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="F" Modifiers="Control,Shift" Invoked="Accel_Invoked" />
         </Grid.KeyboardAccelerators>
 
         <!-- Başlık çubuğu (sürüklenebilir alan) -->
@@ -101,6 +107,13 @@
                 <MenuFlyoutItem Text="Seçimi tersine çevir" Tag="app:invert" Click="Command_Click" KeyboardAcceleratorTextOverride="Num *" />
                 <MenuFlyoutItem Text="Desenle seç…" Tag="app:selectpattern" Click="Command_Click" KeyboardAcceleratorTextOverride="Num +" />
                 <MenuFlyoutItem Text="Desenle seçimi kaldır…" Tag="app:deselectpattern" Click="Command_Click" KeyboardAcceleratorTextOverride="Num −" />
+                <MenuFlyoutItem Text="Toplu yeniden adlandır…" Tag="app:batchrename" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+M">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8AC;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem x:Name="MenuUndoRename" Text="Son toplu adlandırmayı geri al" Tag="app:undorename" Click="Command_Click" IsEnabled="False">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE7A7;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Yolu kopyala" Tag="CopyPath" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+C">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE71B;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
@@ -133,6 +146,16 @@
                 <MenuFlyoutItem Text="Yenile" Tag="Refresh" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+R">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE72C;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Ara…" Tag="app:search" Click="Command_Click" KeyboardAcceleratorTextOverride="Alt+F7">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE721;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Klasörleri karşılaştır (farkları işaretle)" Tag="app:comparemark" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8FD;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Klasör senkronizasyonu…" Tag="app:sync" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE895;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Panelleri eşitle" Tag="app:samefolder" Click="Command_Click">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE895;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
@@ -160,6 +183,9 @@
             </MenuBarItem>
 
             <MenuBarItem Title="Pencere">
+                <MenuFlyoutItem Text="Komut paleti" Tag="app:palette" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+K">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE756;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
                 <MenuFlyoutItem x:Name="MenuDownloads" Text="İndirmeler" Tag="app:downloads" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+J">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE896;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
@@ -366,5 +392,8 @@
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 Text="Tab: panel · Ctrl+T: sekme · Insert: işaretle · yaz: filtrele" />
         </Grid>
+
+        <!-- Komut paleti (Ctrl+K) -->
+        <views:CommandPalette x:Name="Palette" Grid.RowSpan="6" />
     </Grid>
 </Window>
