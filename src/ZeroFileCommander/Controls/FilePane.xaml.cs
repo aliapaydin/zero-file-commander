@@ -1120,12 +1120,11 @@ public sealed partial class FilePane : UserControl
         {
             switch (element)
             {
-                case ListViewItem:
+                case ListViewItem: // TabViewItem de bir ListViewItem
                 case Microsoft.UI.Xaml.Controls.Primitives.ScrollBar:
                 case Microsoft.UI.Xaml.Controls.Primitives.ButtonBase:
                 case TextBox:
                 case BreadcrumbBar:
-                case TabViewItem:
                     return; // öğe ya da denetim: kendi işini yapsın
             }
             if (ReferenceEquals(element, FileList))
