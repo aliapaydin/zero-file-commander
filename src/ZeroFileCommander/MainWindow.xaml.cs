@@ -154,7 +154,13 @@ public sealed partial class MainWindow : Window, IPaneHost
         Activated += (_, e) =>
         {
             _windowActive = e.WindowActivationState != WindowActivationState.Deactivated;
-            if (e.WindowActivationState != WindowActivationState.Deactivated) _ = RefreshDrivesAsync();
+            if (e.WindowActivationState != WindowActivationState.Deactivated)
+            {
+                _ = RefreshDrivesAsync();
+                // Başka bir uygulamada commit/checkout yapılmış olabilir.
+                LeftPane.UpdateGit();
+                RightPane.UpdateGit();
+            }
         };
         _ = RefreshDrivesAsync(force: true);
     }
@@ -906,6 +912,11 @@ public sealed partial class MainWindow : Window, IPaneHost
             }
             ApplyAllSettings();
             if (name == nameof(AppSettings.DownloadsEnabled)) UpdateDownloadIndicators();
+            if (name is nameof(AppSettings.ShowGitStatus) or "All")
+            {
+                LeftPane.UpdateGit(force: true);
+                RightPane.UpdateGit(force: true);
+            }
         });
     }
 

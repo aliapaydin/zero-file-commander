@@ -29,6 +29,7 @@ public sealed partial class SettingsView : UserControl
         _loading = true;
         ThemeChoice.SelectedIndex = (int)_settings.Theme;
         HoverToggle.IsOn = _settings.HoverPreview;
+        GitToggle.IsOn = _settings.ShowGitStatus;
         HoverDelay.Value = _settings.HoverDelayMs;
         HoverDelayText.Text = $"{_settings.HoverDelayMs} ms";
         QueueToggle.IsOn = _settings.UseTransferQueue;
@@ -62,6 +63,11 @@ public sealed partial class SettingsView : UserControl
     {
         if (_loading || ThemeChoice.SelectedIndex < 0) return;
         _settings.Theme = (AppTheme)ThemeChoice.SelectedIndex;
+    }
+
+    private void GitToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (!_loading) _settings.ShowGitStatus = GitToggle.IsOn;
     }
 
     private void HoverToggle_Toggled(object sender, RoutedEventArgs e)

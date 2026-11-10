@@ -68,6 +68,41 @@ public sealed class FileItem : INotifyPropertyChanged
     /// <summary>Gerçek simge varsa yazı tipi simgesi gizlenir.</summary>
     public double GlyphOpacity => _icon is null ? 1 : 0;
 
+    private Services.GitState _git;
+
+    /// <summary>Git deposundaysa dosyanın/klasörün durumu.</summary>
+    public Services.GitState Git
+    {
+        get => _git;
+        set
+        {
+            if (_git == value) return;
+            _git = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Git)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GitText)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GitBrush)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NameOpacity)));
+        }
+    }
+
+    /// <summary>Ad yanındaki küçük işaret: M, A, D, U, ! (klasörlerde nokta).</summary>
+    public string GitText => _git switch
+    {
+        Services.GitState.None or Services.GitState.Ignored => string.Empty,
+        _ when IsDirectory => "●",
+        Services.GitState.Modified => "M",
+        Services.GitState.Added => "A",
+        Services.GitState.Deleted => "D",
+        Services.GitState.Untracked => "U",
+        Services.GitState.Conflict => "!",
+        _ => string.Empty,
+    };
+
+    public Brush? GitBrush => GitColors.For(_git);
+
+    /// <summary>Git'in yok saydığı öğeler sönük gösterilir.</summary>
+    public double NameOpacity => _git == Services.GitState.Ignored ? 0.5 : 1;
+
     /// <summary>Aynı dosyanın içeriği değişmemiş mi (yenilemede nesneyi korumak için).</summary>
     public bool SameAs(FileItem other) =>
         IsDirectory == other.IsDirectory && Size == other.Size && Modified == other.Modified && Name == other.Name;
@@ -84,4 +119,21 @@ public sealed class FileItem : INotifyPropertyChanged
         }
         return unit == 0 ? $"{bytes} B" : $"{value:0.#} {units[unit]}";
     }
+}
+
+/// <summary>Git durum renkleri (iki temada da okunur tonlar).</summary>
+internal static class GitColors
+{
+    private static SolidColorBrush? _modified, _added, _deleted, _conflict;
+
+    public static Brush? For(Services.GitState state) => state switch
+    {
+        Services.GitState.Modified => _modified ??= Make(0xD2, 0x99, 0x22),
+        Services.GitState.Added or Services.GitState.Untracked => _added ??= Make(0x3F, 0xB9, 0x50),
+        Services.GitState.Deleted => _deleted ??= Make(0xE5, 0x53, 0x4B),
+        Services.GitState.Conflict => _conflict ??= Make(0xF8, 0x51, 0x49),
+        _ => null,
+    };
+
+    private static SolidColorBrush Make(byte r, byte g, byte b) => new(Windows.UI.Color.FromArgb(255, r, g, b));
 }

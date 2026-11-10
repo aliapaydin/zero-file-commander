@@ -359,9 +359,110 @@ public sealed partial class FilePane : UserControl
 
         UpdateStatus();
         SelectionChangedEx?.Invoke(this, EventArgs.Empty);
+        UpdateGit(force: sameFolder);
     }
 
     public void Refresh() => Navigate(CurrentPath);
+
+    // ================================================================ Git durumu
+
+    private int _gitVersion;
+    private GitInfo? _git;
+
+    /// <summary>Açık klasör bir Git deposundaysa satırlara durum işaretlerini, yol çubuğuna dalı koyar.</summary>
+    public async void UpdateGit(bool force = false)
+    {
+        int version = ++_gitVersion;
+        try
+        {
+            string path = CurrentPath;
+            if (IsDriveList || IsInArchive || !AppSettings.Current.ShowGitStatus || IsSlowPath(path))
+            {
+                ClearGit();
+                return;
+            }
+            var root = await Task.Run(() => GitService.FindRoot(path));
+            if (version != _gitVersion) return;
+            if (root is null)
+            {
+                ClearGit();
+                return;
+            }
+            var info = await GitService.GetAsync(root, force);
+            if (version != _gitVersion) return;
+            if (info is null)
+            {
+                ClearGit();
+                return;
+            }
+
+            _git = info;
+            foreach (var item in _all)
+                item.Git = item.IsEntry ? info.StateOf(item.FullPath, item.IsDirectory) : GitState.None;
+
+            GitBranchText.Text = info.Summary;
+            GitChangesText.Text = info.HasStatus && info.ChangeCount > 0 ? $"±{info.ChangeCount}" : string.Empty;
+            ToolTipService.SetToolTip(GitPill, info.HasStatus
+                ? $"Git: {info.Branch}{(info.HasUpstream ? string.Empty : " (uzak dal yok)")}\n{info.ChangeCount} değişiklik · {info.Root}"
+                : $"Git: {info.Branch}\ngit.exe bulunamadı; dosya durumları gösterilemiyor.");
+            GitPill.Visibility = Visibility.Visible;
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write("Git durumu", ex);
+            if (version == _gitVersion) ClearGit();
+        }
+    }
+
+    private void ClearGit()
+    {
+        _git = null;
+        GitPill.Visibility = Visibility.Collapsed;
+        foreach (var item in _all) item.Git = GitState.None;
+    }
+
+    private static bool IsSlowPath(string path)
+    {
+        try
+        {
+            var root = Path.GetPathRoot(path);
+            if (string.IsNullOrEmpty(root) || root.StartsWith(@"\\", StringComparison.Ordinal)) return true;
+            return new DriveInfo(root).DriveType is DriveType.Network or DriveType.CDRom;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    private void GitPill_Click(object sender, RoutedEventArgs e)
+    {
+        if (_git is not { } git) return;
+        var menu = new MenuFlyout();
+        var changed = new MenuFlyoutItem { Text = "Değişenleri seç", Icon = new FontIcon { Glyph = "\uE762" }, IsEnabled = git.HasStatus };
+        changed.Click += (_, _) =>
+        {
+            int count = SelectWhere(i => i.Git is GitState.Modified or GitState.Added or GitState.Deleted or GitState.Untracked or GitState.Conflict);
+            ShowStatus(count == 0 ? "Bu klasörde değişen dosya yok" : $"{count} değişen öğe seçildi");
+        };
+        var root = new MenuFlyoutItem { Text = "Depo köküne git", Icon = new FontIcon { Glyph = "\uE80F" } };
+        root.Click += (_, _) => Navigate(git.Root);
+        var copy = new MenuFlyoutItem { Text = "Dal adını kopyala", Icon = new FontIcon { Glyph = "\uE8C8" } };
+        copy.Click += (_, _) =>
+        {
+            var package = new DataPackage();
+            package.SetText(git.Branch);
+            Clipboard.SetContent(package);
+        };
+        var refresh = new MenuFlyoutItem { Text = "Durumu yenile", Icon = new FontIcon { Glyph = "\uE72C" } };
+        refresh.Click += (_, _) => UpdateGit(force: true);
+        menu.Items.Add(changed);
+        menu.Items.Add(root);
+        menu.Items.Add(copy);
+        menu.Items.Add(new MenuFlyoutSeparator());
+        menu.Items.Add(refresh);
+        menu.ShowAt(GitPill, new FlyoutShowOptions { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight });
+    }
 
     public void GoUp()
     {

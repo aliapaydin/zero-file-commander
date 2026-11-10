@@ -28,6 +28,8 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        // ANSI/OEM kod sayfaları (Türkçe CSV'ler, eski ZIP adları) için.
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
         _window = new MainWindow();
         _window.Activate();
     }

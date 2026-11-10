@@ -33,7 +33,7 @@ public static class FileKinds
         Add(FileKind.Text, "txt", "md", "log", "csv", "tsv", "json", "xml", "yaml", "yml", "ini", "cfg", "conf", "toml",
             "cs", "xaml", "csproj", "sln", "js", "ts", "tsx", "jsx", "css", "scss", "html", "htm", "py", "ipynb", "sql",
             "ps1", "psm1", "bat", "cmd", "sh", "java", "kt", "swift", "go", "rs", "c", "cpp", "h", "hpp", "php", "rb",
-            "r", "dax", "m", "gitignore", "editorconfig", "env");
+            "r", "dax", "m", "gitignore", "editorconfig", "env", "tmdl", "bim", "pbir", "pbism", "pbip", "pq");
         Add(FileKind.Office, "doc", "docx", "docm", "dotx", "rtf", "odt", "xls", "xlsx", "xlsm", "xlsb", "ods",
             "ppt", "pptx", "pptm", "ppsx", "odp", "vsd", "vsdx", "msg", "pub", "one");
         Add(FileKind.Archive, "zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "xz", "cab", "iso");

@@ -58,10 +58,10 @@ Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor
 - [x] Yeni pencere (Ctrl+N); pencereler/monitörler arası sürükle-bırak ve Ctrl+Shift+→ ile gönderme
 - [x] Raf: dosyaları toplayıp sonra bırakmak için her zaman üstte duran pencere (Ctrl+Shift+S)
 
-## Faz 4 · v0.7: Veri ve geliştirici önizlemeleri
-- [ ] CSV / Parquet tablo önizlemesi
-- [ ] Power BI (PBIX/PBIP) meta bilgileri
-- [ ] Git durumu (değişen dosyalar, dal adı)
+## Faz 4 · v0.7: Veri ve geliştirici önizlemeleri ✅
+- [x] CSV / TSV / Parquet tablo önizlemesi (ayraç ve kodlama tahmini, sütun türleri, ilk 300 satır)
+- [x] Power BI meta bilgileri: PBIX/PBIT sayfaları, görseller, bağlantılar, Power Query; PBIP/TMSL/TMDL tabloları, ölçüler (DAX), ilişkiler
+- [x] Git durumu: dal adı, ileri/geri, satırlarda M/A/D/U işaretleri, yok sayılanlar sönük
 
 ## Faz 5 · v0.8: Bağlantılar
 - [ ] Kayıtlı ağ/NAS bağlantıları

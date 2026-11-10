@@ -70,7 +70,12 @@ public sealed partial class PreviewPane : UserControl
         LoadingRing.IsActive = true;
         try
         {
-            switch (item.Kind)
+            string extension = Path.GetExtension(item.FullPath);
+            if (!item.IsDirectory && TabularPreview.IsTabular(extension))
+                await ShowTableAsync(item, version);
+            else if (PowerBiInspector.CanInspect(item.FullPath, item.IsDirectory))
+                await ShowMetaAsync(item, version);
+            else switch (item.Kind)
             {
                 case FileKind.Folder:
                     await ShowFolderAsync(item, version);
@@ -461,10 +466,259 @@ public sealed partial class PreviewPane : UserControl
         TextScroller.Visibility = Visibility.Collapsed;
         FolderScroller.Visibility = Visibility.Collapsed;
         FolderGrid.Children.Clear();
+        TableScroller.Visibility = Visibility.Collapsed;
+        TableGrid.Children.Clear();
+        TableGrid.ColumnDefinitions.Clear();
+        MetaScroller.Visibility = Visibility.Collapsed;
+        MetaStack.Children.Clear();
         HandlerSurface.Visibility = Visibility.Collapsed;
         PageBar.Visibility = Visibility.Collapsed;
         Placeholder.Visibility = Visibility.Collapsed;
         LoadingRing.IsActive = false;
+    }
+
+    // ---------------------------------------------------------------- Tablo (CSV, TSV, Parquet)
+
+    private const double RowHeight = 22;
+
+    private async Task ShowTableAsync(FileItem item, int version)
+    {
+        TableData data;
+        try
+        {
+            data = await TabularPreview.ReadAsync(item.FullPath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (version != _version) return;
+            CrashLog.Write("Tablo önizleme", ex);
+            // CSV ise düz metne dön; Parquet bozuksa bilgi ver.
+            var text = item.Kind == FileKind.Text ? await FilePreview.ReadTextHeadAsync(item.FullPath) : null;
+            if (version != _version) return;
+            if (text is not null)
+            {
+                PreviewText.Text = text;
+                TextScroller.Visibility = Visibility.Visible;
+            }
+            else ShowPlaceholder("\uE80A", "Tablo okunamadı: " + ex.Message);
+            return;
+        }
+        if (version != _version) return;
+        if (data.Columns.Count == 0)
+        {
+            ShowPlaceholder("\uE80A", data.Details.Length > 0 ? data.Details : "Boş tablo");
+            return;
+        }
+
+        BuildTable(data);
+        TableScroller.Visibility = Visibility.Visible;
+        TableScroller.ChangeView(0, 0, null, disableAnimation: true);
+
+        string rows = data.TotalRows is { } total
+            ? total > data.Rows.Count ? $"{total:N0} satırın ilk {data.Rows.Count:N0}'ü" : $"{total:N0} satır"
+            : $"ilk {data.Rows.Count:N0} satır";
+        KindText.Text = Path.GetExtension(item.FullPath).Equals(".parquet", StringComparison.OrdinalIgnoreCase) ? "Parquet tablosu" : "Ayrılmış metin tablosu";
+        ExtraText.Text = $"{data.Columns.Count} sütun · {rows}\n{data.Details}";
+    }
+
+    /// <summary>
+    /// Her sütun tek bir çok satırlı TextBlock: binlerce hücre öğesi yerine birkaç düzine öğe;
+    /// satırlar sabit satır yüksekliğiyle hizalanır, arkadaki şeritler okunurluğu sağlar.
+    /// </summary>
+    private void BuildTable(TableData data)
+    {
+        int columns = data.Columns.Count;
+        int rows = data.Rows.Count;
+        var stripeStyle = (Style)Resources["TableStripeStyle"];
+        var headerStyle = (Style)Resources["TableHeaderStyle"];
+        var mono = new Microsoft.UI.Xaml.Media.FontFamily("Cascadia Mono, Consolas");
+
+        // Satır numarası sütunu
+        int digits = Math.Max(2, rows.ToString().Length);
+        TableGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(digits * 7.5 + 16) });
+        for (int c = 0; c < columns; c++)
+        {
+            int longest = Math.Max(data.Columns[c].Length + 2, data.ColumnTypes.Count > c ? data.ColumnTypes[c].Length : 0);
+            foreach (var row in data.Rows) longest = Math.Max(longest, row[c].Length);
+            double width = Math.Clamp(longest * 7.2 + 20, 48, 300);
+            TableGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) });
+        }
+
+        var header = new Border { Style = headerStyle };
+        Grid.SetColumnSpan(header, columns + 1);
+        TableGrid.Children.Add(header);
+
+        var stripes = new StackPanel();
+        for (int r = 0; r < rows; r++)
+            stripes.Children.Add(r % 2 == 1 ? new Border { Height = RowHeight, Style = stripeStyle } : new Border { Height = RowHeight });
+        Grid.SetRow(stripes, 1);
+        Grid.SetColumnSpan(stripes, columns + 1);
+        TableGrid.Children.Add(stripes);
+
+        TableGrid.Children.Add(MakeColumn(string.Join("\n", Enumerable.Range(1, rows)), 0, numeric: true, mono, secondary: true));
+        for (int c = 0; c < columns; c++)
+        {
+            var title = new StackPanel { Padding = new Thickness(8, 6, 8, 6), Spacing = 0 };
+            title.Children.Add(new TextBlock
+            {
+                Text = data.Columns[c],
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 12,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            });
+            if (data.ColumnTypes.Count > c)
+                title.Children.Add(new TextBlock { Text = data.ColumnTypes[c], Style = (Style)Resources["MetaDetailStyle"], FontSize = 11 });
+            ToolTipService.SetToolTip(title, data.Columns[c]);
+            Grid.SetColumn(title, c + 1);
+            TableGrid.Children.Add(title);
+
+            bool numeric = data.ColumnTypes.Count > c && data.ColumnTypes[c] is "sayı" or "ondalık" or "tam sayı";
+            int column = c;
+            TableGrid.Children.Add(MakeColumn(string.Join("\n", data.Rows.Select(r => r[column])), c + 1, numeric, mono, secondary: false));
+        }
+    }
+
+    private static TextBlock MakeColumn(string text, int column, bool numeric, Microsoft.UI.Xaml.Media.FontFamily mono, bool secondary)
+    {
+        var block = new TextBlock
+        {
+            Text = text,
+            FontSize = 12,
+            LineHeight = RowHeight,
+            LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextAlignment = numeric ? TextAlignment.Right : TextAlignment.Left,
+            Padding = new Thickness(8, 0, 8, 0),
+            IsTextSelectionEnabled = !secondary,
+        };
+        if (numeric) block.FontFamily = mono;
+        if (secondary)
+        {
+            block.Opacity = 0.5;
+            block.FontSize = 11;
+        }
+        Grid.SetRow(block, 1);
+        Grid.SetColumn(block, column);
+        return block;
+    }
+
+    // ---------------------------------------------------------------- Yapı özeti (Power BI)
+
+    private const int MetaEntriesShown = 150;
+
+    private async Task ShowMetaAsync(FileItem item, int version)
+    {
+        MetaReport report;
+        try
+        {
+            report = await PowerBiInspector.InspectAsync(item.FullPath, item.IsDirectory);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (version != _version) return;
+            CrashLog.Write("Power BI önizleme", ex);
+            if (item.IsDirectory) await ShowFolderAsync(item, version);
+            else ShowPlaceholder("\uE9D9", "Power BI dosyası okunamadı: " + ex.Message);
+            return;
+        }
+        if (version != _version) return;
+
+        KindText.Text = item.IsDirectory
+            ? item.Name.EndsWith(".Report", StringComparison.OrdinalIgnoreCase) ? "Power BI raporu (PBIP klasörü)" : "Power BI anlam modeli (PBIP klasörü)"
+            : Path.GetExtension(item.FullPath).ToLowerInvariant() switch
+            {
+                ".pbix" => "Power BI raporu",
+                ".pbit" => "Power BI şablonu",
+                ".pbip" => "Power BI projesi",
+                _ => "Tablosal model (TMSL)",
+            };
+        ExtraText.Text = string.Join(" · ", report.Badges);
+
+        if (report.Badges.Count > 0)
+        {
+            var wrap = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            foreach (var badge in report.Badges)
+            {
+                wrap.Children.Add(new Border
+                {
+                    Style = (Style)Resources["MetaBadgeStyle"],
+                    Child = new TextBlock { Text = badge, Style = (Style)Resources["MetaBadgeTextStyle"] },
+                });
+            }
+            MetaStack.Children.Add(new ScrollViewer
+            {
+                Content = wrap,
+                HorizontalScrollMode = ScrollMode.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+                VerticalScrollMode = ScrollMode.Disabled,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            });
+        }
+
+        foreach (var note in report.Notes)
+            MetaStack.Children.Add(new InfoBar { IsOpen = true, IsClosable = false, Severity = InfoBarSeverity.Informational, Message = note });
+
+        var mono = new Microsoft.UI.Xaml.Media.FontFamily("Cascadia Mono, Consolas");
+        foreach (var section in report.Sections)
+        {
+            var panel = new StackPanel { Spacing = 4 };
+            var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 0, 2) };
+            head.Children.Add(new FontIcon { Glyph = section.Glyph, FontSize = 14 });
+            head.Children.Add(new TextBlock { Text = section.Title, Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"] });
+            head.Children.Add(new TextBlock { Text = section.Entries.Count.ToString(), Style = (Style)Resources["MetaDetailStyle"], VerticalAlignment = VerticalAlignment.Center });
+            panel.Children.Add(head);
+
+            foreach (var entry in section.Entries.Take(MetaEntriesShown))
+                panel.Children.Add(MakeMetaEntry(entry, mono));
+            if (section.Entries.Count > MetaEntriesShown)
+                panel.Children.Add(new TextBlock { Text = $"… ve {section.Entries.Count - MetaEntriesShown} tane daha", Style = (Style)Resources["MetaDetailStyle"] });
+            MetaStack.Children.Add(panel);
+        }
+
+        if (MetaStack.Children.Count == 0)
+        {
+            ShowPlaceholder("\uE9D9", "Okunabilir bir yapı bulunamadı");
+            return;
+        }
+        MetaScroller.Visibility = Visibility.Visible;
+        MetaScroller.ChangeView(0, 0, null, disableAnimation: true);
+    }
+
+    private UIElement MakeMetaEntry(MetaEntry entry, Microsoft.UI.Xaml.Media.FontFamily mono)
+    {
+        var header = new StackPanel { Spacing = 0 };
+        header.Children.Add(new TextBlock { Text = entry.Title, TextWrapping = TextWrapping.Wrap, FontSize = 13 });
+        if (!string.IsNullOrEmpty(entry.Detail))
+            header.Children.Add(new TextBlock { Text = entry.Detail, Style = (Style)Resources["MetaDetailStyle"] });
+
+        if (string.IsNullOrWhiteSpace(entry.Code))
+        {
+            header.Padding = new Thickness(26, 2, 0, 2);
+            return header;
+        }
+
+        // Kod (DAX / M) yalnızca açılınca oluşturulur.
+        var expander = new Expander
+        {
+            Header = header,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Padding = new Thickness(12, 8, 12, 8),
+        };
+        expander.Expanding += (_, _) =>
+        {
+            if (expander.Content is not null) return;
+            expander.Content = new TextBlock
+            {
+                Text = entry.Code,
+                FontFamily = mono,
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                IsTextSelectionEnabled = true,
+            };
+        };
+        return expander;
     }
 
     private void ShowPlaceholder(string glyph, string text)

@@ -16,6 +16,7 @@
                     <x:String>Karanlık</x:String>
                 </RadioButtons>
                 <ToggleSwitch x:Name="HoverToggle" Header="Üzerine gelince önizle (görsel, video, PDF)" Toggled="HoverToggle_Toggled" />
+                <ToggleSwitch x:Name="GitToggle" Header="Git depolarında dal adını ve dosya durumlarını göster" Toggled="GitToggle_Toggled" />
                 <StackPanel Orientation="Horizontal" Spacing="12">
                     <TextBlock Text="Bekleme" VerticalAlignment="Center" />
                     <Slider x:Name="HoverDelay" Width="220" Minimum="0" Maximum="1000" StepFrequency="50" ValueChanged="HoverDelay_ValueChanged" />
