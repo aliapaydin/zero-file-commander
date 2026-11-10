@@ -32,8 +32,8 @@ public static class ConnectionDialogs
             Header = "Bağlantı noktası",
             Minimum = 0,
             Maximum = 65535,
-            Value = connection.Port,
-            PlaceholderText = "varsayılan",
+            Value = connection.Port > 0 ? connection.Port : double.NaN, // boş = varsayılan (SFTP 22, FTP 21)
+            PlaceholderText = "22 / 21",
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Hidden,
             Width = 130,
         };
@@ -126,7 +126,7 @@ public static class ConnectionDialogs
 
         connection.Kind = Kinds[Math.Max(0, kind.SelectedIndex)];
         connection.Host = host.Text.Trim().TrimStart('\\').TrimEnd('/', '\\');
-        connection.Port = double.IsNaN(port.Value) ? 0 : (int)port.Value;
+        connection.Port = double.IsNaN(port.Value) || port.Value <= 0 ? 0 : (int)port.Value;
         connection.User = user.Text.Trim();
         connection.Path = path.Text.Trim();
         connection.KeyFile = connection.Kind == ConnectionKind.Sftp && keyFile.Text.Trim().Length > 0 ? keyFile.Text.Trim() : null;
