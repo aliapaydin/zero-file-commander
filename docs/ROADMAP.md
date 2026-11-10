@@ -35,44 +35,44 @@ Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor
 - [x] Önizlemede her şey panel genişliğine sığıyor; PDF sayfaları alt alta, aşağı kaydırarak
 - [x] Görünüm menüsünden açılıp kapanan sürücü çubuğu (doluluk göstergeli, tıklayınca aktif panelde açar)
 
-## v0.3.x: Commander temelleri
-- [ ] Sekmeler (Ctrl+T, Ctrl+W, sekmeyi diğer panele sürükleme)
-- [ ] Tıklanabilir yol çubuğu (breadcrumb)
-- [ ] Insert/Space ile işaretleme, renkli işaretli dosyalar
-- [ ] Sıralama (ad, uzantı, boyut, tarih) ve sütun genişliği
-- [ ] Gerçek dosya simgeleri (shell icon), klasör izleme (FileSystemWatcher)
-- [ ] Bir klasörün üzerine bırakınca o klasöre taşıma
-- [ ] Windows'un kendi sağ tık menüsünü "Daha fazla seçenek" altında gösterme
-- [ ] Tarayıcı eklentisi veya `zfc-download:` protokolü ile indirmeleri devralma
-- [ ] Tek örnek (single instance): ikinci açılış mevcut pencereyi öne getirsin
-- [ ] Ayarların kalıcı olması (son klasörler, panel başına görünüm)
+## Faz 1 · v0.4: Commander temelleri ✅
+- [x] Sekmeler: Ctrl+T, Ctrl+W, Ctrl+Tab, sürükleyerek sıralama; sağ tıkla "Karşı panelde aç", çoğalt, diğerlerini kapat; kapatıp açınca geri gelir
+- [x] Tıklanabilir yol çubuğu (breadcrumb); ✎ ya da Ctrl+L ile yazarak düzenleme
+- [x] Sıralanabilir sütunlar (ad, uzantı, boyut, tarih), panel başına hatırlanır; uzantı sütunu
+- [x] Windows'un gerçek dosya simgeleri (yalnızca görünen satırlar için, uzantı başına önbellek)
+- [x] Canlı yenileme: klasör dışarıdan değişince liste güncellenir, seçim ve kaydırma bozulmaz
+- [x] Yazarak filtreleme (Backspace siler, Esc temizler)
+- [x] Insert ile işaretle ve ilerle, Num + / Num − ile desenle seç/kaldır, Num * ile tersine çevir
 
-## v0.4: Önizleme ve düzenleme
-- [ ] Önizle ve düzenle ekranı: bölünmüş görünüm, sözdizimi renklendirme, kaydetme
-- [ ] CSV tablo önizlemesi
-- [ ] Hızlı bakış kartında sabitleme (P) ve Space ile tam ekran
-- [ ] Video sahne şeridi
-
-## v0.4.x: Görünümler
-- [ ] Detay, Liste, Simgeler ve Galeri modları, panel başına ayrı mod
-- [ ] Ctrl + fare tekeri ile boyutlandırma (5 kademe)
-- [ ] Küçük resim önbelleği (Windows thumbnail cache ve kendi disk önbelleğimiz)
-
-## v0.5: Transfer motoru
-- [ ] Kendi transfer kuyruğumuz: duraklat/devam, hız, kalan süre, öncelik
-- [ ] Bloklamayan çakışma çözümü ("yalnızca daha yeniyse değiştir" gibi kurallar)
+## Faz 2 · v0.5: Güç araçları
+- [ ] Toplu yeniden adlandırma (desen, sayaç, bul-değiştir, önizlemeli)
 - [ ] Klasör karşılaştırma ve senkronizasyon
+- [ ] ZIP arşivlerine klasör gibi girme, çıkarma, sıkıştırma
+- [ ] Alt klasörlerde arama (ad ve içerik)
+- [ ] Komut paleti (Ctrl+K)
 
-## v0.6: Çoklu ekran
-- [ ] Her monitörde ayrı pencere, pencereler arası sürükle-bırak
-- [ ] Kenar rafı (Ctrl+Shift+S)
-- [ ] Diğer pencereye gönder (Ctrl+Shift+→)
+## Faz 3 · v0.6: Transfer motoru ve çoklu pencere
+- [ ] Kendi kopyalama kuyruğu: duraklat/devam, hız, kalan süre
+- [ ] Bloklamayan çakışma çözümü ("yalnızca daha yeniyse değiştir" gibi kurallar)
+- [ ] Yeni pencere; pencereler/monitörler arası sürükle-bırak
 
-## v0.7: Komut paleti ve güç özellikleri
-- [ ] Ctrl+K komut paleti: komutlar, klasörler, son dosyalar
-- [ ] Toplu yeniden adlandırma
-- [ ] ZIP/7z arşivlere klasör gibi girme
-- [ ] Kabuk bağlam menüsü entegrasyonu
+## Faz 4 · v0.7: Veri ve geliştirici önizlemeleri
+- [ ] CSV / Parquet tablo önizlemesi
+- [ ] Power BI (PBIX/PBIP) meta bilgileri
+- [ ] Git durumu (değişen dosyalar, dal adı)
+
+## Faz 5 · v0.8: Bağlantılar
+- [ ] Kayıtlı ağ/NAS bağlantıları
+- [ ] SFTP / FTP
+- [ ] Bulut klasörleri
+
+## Bekleyenler
+- [ ] Önizle ve düzenle ekranı: sözdizimi renklendirme, kaydetme
+- [ ] Hızlı bakış kartında sabitleme (P), video sahne şeridi
+- [ ] Galeri/simge görünümleri, Ctrl + tekerlek ile boyut
+- [ ] Windows'un kendi sağ tık menüsü ("Daha fazla seçenek")
+- [ ] Tek örnek (ikinci açılış mevcut pencereyi öne getirsin)
+- [ ] Tarayıcı eklentisi ile indirmeleri devralma
 
 ## v1.0: Yayın
 - [ ] Erişilebilirlik ve performans turu

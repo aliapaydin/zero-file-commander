@@ -17,7 +17,7 @@
 
 ---
 
-> **Status:** early development (v0.3). See the [roadmap](docs/ROADMAP.md) for what's done and what's next.
+> **Status:** early development (v0.4). See the [roadmap](docs/ROADMAP.md) for what's done and what's next.
 
 ## What works today (v0.2)
 
