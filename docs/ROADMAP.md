@@ -44,12 +44,13 @@ Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor
 - [x] Yazarak filtreleme (Backspace siler, Esc temizler)
 - [x] Insert ile işaretle ve ilerle, Num + / Num − ile desenle seç/kaldır, Num * ile tersine çevir
 
-## Faz 2 · v0.5: Güç araçları
-- [ ] Toplu yeniden adlandırma (desen, sayaç, bul-değiştir, önizlemeli)
-- [ ] Klasör karşılaştırma ve senkronizasyon
-- [ ] ZIP arşivlerine klasör gibi girme, çıkarma, sıkıştırma
-- [ ] Alt klasörlerde arama (ad ve içerik)
-- [ ] Komut paleti (Ctrl+K)
+## Faz 2 · v0.5: Güç araçları ✅
+- [x] Toplu yeniden adlandırma (Ctrl+M): şablon ([N] [N1-3] [E] [C] [D] [T] [P]), bul/değiştir (regex), harf düzeni, sayaç, canlı önizleme, çakışma kontrolü, geri alma
+- [x] Klasörleri karşılaştır: farkları iki panelde işaretler
+- [x] Klasör senkronizasyonu penceresi: alt klasörler, isteğe bağlı içerik karşılaştırma, satır satır yön seçimi; hiçbir şeyi silmez
+- [x] ZIP arşivlerine klasör gibi girme (Enter), F5 ile çıkarma, arşive ekleme/silme, ZIP olarak sıkıştırma, Türkçe adlı eski ZIP'ler
+- [x] Arama (Alt+F7 / Ctrl+Shift+F): ad deseni ve içerik, sonuçlar akarak gelir, "Panelde göster"
+- [x] Komut paleti (Ctrl+K): komutlar, son klasörler, sürücüler, bu klasördeki dosyalar; ">" ve "/" süzgeçleri
 
 ## Faz 3 · v0.6: Transfer motoru ve çoklu pencere
 - [ ] Kendi kopyalama kuyruğu: duraklat/devam, hız, kalan süre
