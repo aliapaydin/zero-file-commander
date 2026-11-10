@@ -10,8 +10,8 @@
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Marka renkleri (bkz. docs/DESIGN.md) -->
-            <Color x:Key="ZeroBlue">#1F6FD6</Color>
-            <Color x:Key="SignalAmber">#F2B84B</Color>
+            <SolidColorBrush x:Key="ZeroBlueBrush" Color="#1F6FD6" />
+            <SolidColorBrush x:Key="SignalAmberBrush" Color="#F2B84B" />
             <SolidColorBrush x:Key="MarkedItemBrush" Color="#C98A12" />
         </ResourceDictionary>
     </Application.Resources>
