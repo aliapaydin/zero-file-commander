@@ -48,23 +48,28 @@ public sealed partial class PaneSplitter : Grid
         };
         Children.Add(_line);
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(this, "Panel ayırıcı");
+
+        PointerEntered += HandlePointerEntered;
+        PointerExited += HandlePointerExited;
+        PointerPressed += HandlePointerPressed;
+        PointerMoved += HandlePointerMoved;
+        PointerReleased += HandlePointerReleased;
+        PointerCaptureLost += HandlePointerCaptureLost;
+        DoubleTapped += HandleDoubleTapped;
     }
 
-    protected override void OnPointerEntered(PointerRoutedEventArgs e)
+    private void HandlePointerEntered(object sender, PointerRoutedEventArgs e)
     {
-        base.OnPointerEntered(e);
         _line.Opacity = 0.8;
     }
 
-    protected override void OnPointerExited(PointerRoutedEventArgs e)
+    private void HandlePointerExited(object sender, PointerRoutedEventArgs e)
     {
-        base.OnPointerExited(e);
         if (!_dragging) _line.Opacity = 0;
     }
 
-    protected override void OnPointerPressed(PointerRoutedEventArgs e)
+    private void HandlePointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        base.OnPointerPressed(e);
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         _dragging = CapturePointer(e.Pointer);
         _lastX = e.GetCurrentPoint(null).Position.X;
@@ -72,9 +77,8 @@ public sealed partial class PaneSplitter : Grid
         e.Handled = true;
     }
 
-    protected override void OnPointerMoved(PointerRoutedEventArgs e)
+    private void HandlePointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        base.OnPointerMoved(e);
         if (!_dragging) return;
         double x = e.GetCurrentPoint(null).Position.X;
         double delta = x - _lastX;
@@ -84,21 +88,18 @@ public sealed partial class PaneSplitter : Grid
         e.Handled = true;
     }
 
-    protected override void OnPointerReleased(PointerRoutedEventArgs e)
+    private void HandlePointerReleased(object sender, PointerRoutedEventArgs e)
     {
-        base.OnPointerReleased(e);
         EndDrag(e.Pointer);
     }
 
-    protected override void OnPointerCaptureLost(PointerRoutedEventArgs e)
+    private void HandlePointerCaptureLost(object sender, PointerRoutedEventArgs e)
     {
-        base.OnPointerCaptureLost(e);
         EndDrag(null);
     }
 
-    protected override void OnDoubleTapped(DoubleTappedRoutedEventArgs e)
+    private void HandleDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        base.OnDoubleTapped(e);
         ResetRequested?.Invoke(this, EventArgs.Empty);
         DragCompleted?.Invoke(this, EventArgs.Empty);
     }
