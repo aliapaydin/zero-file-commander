@@ -52,9 +52,9 @@
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE7AC;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Yeni klasör" Tag="NewFolder" Click="Command_Click" KeyboardAcceleratorTextOverride="F7">
-                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8F4;" /></MenuFlyoutItem.Icon>
-                </MenuFlyoutItem>
+                <MenuFlyoutSubItem x:Name="MenuNew" Text="Yeni">
+                    <MenuFlyoutSubItem.Icon><FontIcon Glyph="&#xE710;" /></MenuFlyoutSubItem.Icon>
+                </MenuFlyoutSubItem>
                 <MenuFlyoutItem Text="Terminalde aç" Tag="OpenTerminal" Click="Command_Click">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE756;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
@@ -134,6 +134,9 @@
                 <ToggleMenuFlyoutItem x:Name="MenuShowPreview" Text="Önizleme paneli" Tag="app:preview" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+Q" />
                 <ToggleMenuFlyoutItem x:Name="MenuHover" Text="Üzerine gelince önizle" Tag="app:hover" Click="Command_Click" />
                 <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Panel yerleşimini sıfırla" Tag="app:resetlayout" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE7A7;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
                 <MenuFlyoutSubItem Text="Tema">
                     <MenuFlyoutSubItem.Icon><FontIcon Glyph="&#xE790;" /></MenuFlyoutSubItem.Icon>
                     <RadioMenuFlyoutItem x:Name="MenuThemeSystem" Text="Sisteme göre" GroupName="theme" Tag="app:theme:0" Click="Command_Click" />
@@ -164,6 +167,9 @@
                 <MenuFlyoutItem Text="Hata bildir" Tag="app:issues" Click="Command_Click">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xEBE8;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Hata günlüğünü aç" Tag="app:log" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE9D9;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Zero File Commander hakkında" Tag="app:about" Click="Command_Click">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE946;" /></MenuFlyoutItem.Icon>
@@ -192,8 +198,11 @@
                 DefaultLabelPosition="Right"
                 Background="Transparent"
                 IsDynamicOverflowEnabled="True">
-                <AppBarButton x:Name="RbNewFolder" Label="Yeni klasör" Tag="NewFolder" Click="Command_Click" ToolTipService.ToolTip="Yeni klasör (F7)">
-                    <AppBarButton.Icon><FontIcon Glyph="&#xE8F4;" /></AppBarButton.Icon>
+                <AppBarButton x:Name="RbNew" Label="Yeni" ToolTipService.ToolTip="Yeni klasör veya dosya">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
+                    <AppBarButton.Flyout>
+                        <MenuFlyout x:Name="RibbonNewMenu" Placement="BottomEdgeAlignedLeft" />
+                    </AppBarButton.Flyout>
                 </AppBarButton>
                 <AppBarButton x:Name="RbPaste" Label="Yapıştır" Tag="Paste" Click="Command_Click" ToolTipService.ToolTip="Yapıştır (Ctrl+V)">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE77F;" /></AppBarButton.Icon>
@@ -243,18 +252,20 @@
             </CommandBar>
         </Grid>
 
-        <!-- İçerik: klasör ağacı | sol panel | sağ panel | önizleme -->
+        <!-- İçerik: klasör ağacı | sol panel | sağ panel | önizleme (aralarında sürüklenebilir ayırıcılar) -->
         <Grid x:Name="ContentGrid" Grid.Row="3" Padding="10,0,10,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="TreeColumn" Width="0" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="TreeSplitColumn" Width="0" />
+                <ColumnDefinition x:Name="LeftColumn" Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition x:Name="RightColumn" Width="*" />
+                <ColumnDefinition x:Name="PreviewSplitColumn" Width="0" />
                 <ColumnDefinition x:Name="PreviewColumn" Width="0" />
             </Grid.ColumnDefinitions>
 
             <Border
                 x:Name="TreeHost"
-                Margin="0,0,8,0"
                 Padding="4"
                 Visibility="Collapsed"
                 CornerRadius="10"
@@ -267,11 +278,14 @@
                     Expanding="FolderTree_Expanding"
                     ItemInvoked="FolderTree_ItemInvoked" />
             </Border>
+            <controls:PaneSplitter x:Name="TreeSplitter" Grid.Column="1" Visibility="Collapsed" />
 
-            <controls:FilePane x:Name="LeftPane" Grid.Column="1" Margin="0,0,4,0" />
-            <controls:FilePane x:Name="RightPane" Grid.Column="2" Margin="4,0,0,0" />
+            <controls:FilePane x:Name="LeftPane" Grid.Column="2" />
+            <controls:PaneSplitter x:Name="MiddleSplitter" Grid.Column="3" />
+            <controls:FilePane x:Name="RightPane" Grid.Column="4" />
 
-            <controls:PreviewPane x:Name="Preview" Grid.Column="3" Margin="8,0,0,0" Visibility="Collapsed" />
+            <controls:PaneSplitter x:Name="PreviewSplitter" Grid.Column="5" Visibility="Collapsed" />
+            <controls:PreviewPane x:Name="Preview" Grid.Column="6" Visibility="Collapsed" />
         </Grid>
 
         <!-- Alt çubuk: fonksiyon tuşları + indirme takibi -->

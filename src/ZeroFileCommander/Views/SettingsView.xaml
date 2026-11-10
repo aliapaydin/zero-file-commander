@@ -53,6 +53,21 @@
                 </StackPanel>
             </StackPanel>
 
+            <!-- Yerleşim -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="Yerleşim" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <TextBlock
+                    TextWrapping="Wrap"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="Pencere konumları/boyutları, panel genişlikleri ve son açık klasörler otomatik hatırlanır. Ayırıcıya çift tıklamak o ayırıcıyı varsayılana döndürür." />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Yerleşimi sıfırla" Click="ResetLayout_Click" />
+                    <Button Content="Tüm ayarları sıfırla" Click="ResetAll_Click" />
+                </StackPanel>
+                <TextBlock x:Name="ResetStatus" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+            </StackPanel>
+
             <!-- Bildirimler -->
             <StackPanel Spacing="10">
                 <TextBlock Text="Bildirimler" Style="{StaticResource SubtitleTextBlockStyle}" />

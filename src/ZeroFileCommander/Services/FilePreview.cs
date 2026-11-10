@@ -62,13 +62,26 @@ public static class FilePreview
         }
     }
 
+    public static async Task<PdfDocument?> LoadPdfAsync(string path)
+    {
+        try
+        {
+            var file = await StorageFile.GetFileFromPathAsync(path);
+            return await PdfDocument.LoadFromFileAsync(file);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static async Task<BitmapImage?> RenderPdfPageAsync(StorageFile file, uint index, uint width)
     {
         var doc = await PdfDocument.LoadFromFileAsync(file);
         return await RenderPageAsync(doc, index, width);
     }
 
-    private static async Task<BitmapImage?> RenderPageAsync(PdfDocument doc, uint index, uint width)
+    public static async Task<BitmapImage?> RenderPageAsync(PdfDocument doc, uint index, uint width)
     {
         if (doc.PageCount == 0) return null;
         using var page = doc.GetPage(Math.Min(index, doc.PageCount - 1));

@@ -24,6 +24,7 @@ public static class Dialogs
             DefaultButton = defaultButton,
         };
         if (primary is not null) dialog.PrimaryButtonText = primary;
+        Overlay.Track(dialog);
         return dialog;
     }
 

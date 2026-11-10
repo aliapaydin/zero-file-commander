@@ -264,9 +264,13 @@ public sealed partial class FilePane : UserControl
         Activated?.Invoke(this, EventArgs.Empty);
 
         var menu = BuildContextMenu(item is { IsEntry: true } ? item : null);
+        Overlay.Track(menu);
+        menu.Opened += (_, _) => CursorHelper.ApplyToOpenPopups(XamlRoot);
+        // Menü, tıklanan noktadan sağa-aşağı açılır (sol üst köşesi imleçte).
         menu.ShowAt(FileList, new FlyoutShowOptions
         {
             Position = e.GetPosition(FileList),
+            Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft,
             ShowMode = FlyoutShowMode.Standard,
         });
         e.Handled = true;
@@ -334,6 +338,13 @@ public sealed partial class FilePane : UserControl
 
             if (!IsDriveList)
             {
+                var newButton = new AppBarButton { Label = "Yeni", Icon = new FontIcon { Glyph = "\uE710" } };
+                var newMenu = new MenuFlyout { Placement = FlyoutPlacementMode.RightEdgeAlignedTop };
+                NewMenu.Populate(newMenu.Items, entry => _ = Host?.CreateNewAsync(this, entry));
+                newMenu.Opened += (_, _) => CursorHelper.ApplyToOpenPopups(XamlRoot);
+                newButton.Flyout = newMenu;
+                menu.SecondaryCommands.Add(newButton);
+                menu.SecondaryCommands.Add(new AppBarSeparator());
                 menu.SecondaryCommands.Add(MenuButton("Terminalde aç", "", PaneCommand.OpenTerminal));
                 menu.SecondaryCommands.Add(MenuButton("Dosya Gezgini'nde aç", "", PaneCommand.ShowInExplorer));
                 menu.SecondaryCommands.Add(MenuButton("Yolu kopyala", "", PaneCommand.CopyPath));

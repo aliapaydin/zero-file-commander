@@ -54,8 +54,38 @@ public sealed class AppSettings
     }
     public bool CaptureClipboardLinks { get => Get(false); set => Set(value); }
 
+    // ---- Yerleşim (hatırlanır) ----
+    public string MainWindowBounds { get => Get(string.Empty); set => Set(value); }
+    public string DownloadsWindowBounds { get => Get(string.Empty); set => Set(value); }
+    public double TreeWidth { get => Get(250.0); set => Set(value); }
+    public double PreviewWidth { get => Get(360.0); set => Set(value); }
+    /// <summary>Sol panelin iki panelin toplam genişliğindeki payı (0–1).</summary>
+    public double LeftRatio { get => Get(0.5); set => Set(value); }
+    public string LeftPath { get => Get(string.Empty); set => Set(value); }
+    public string RightPath { get => Get(string.Empty); set => Set(value); }
+
     // ---- Bildirimler ----
     public NotificationPosition NotificationPosition { get => (NotificationPosition)Get(0); set => Set((int)value); }
+
+    private static readonly string[] LayoutKeys =
+    [
+        nameof(MainWindowBounds), nameof(DownloadsWindowBounds), nameof(TreeWidth),
+        nameof(PreviewWidth), nameof(LeftRatio),
+    ];
+
+    /// <summary>Pencere konum/boyutları ve panel genişliklerini varsayılana döndürür.</summary>
+    public void ResetLayout()
+    {
+        foreach (var key in LayoutKeys) _store.Values.Remove(key);
+        Changed?.Invoke(this, "Layout");
+    }
+
+    /// <summary>Tüm ayarları siler.</summary>
+    public void ResetAll()
+    {
+        _store.Values.Clear();
+        Changed?.Invoke(this, "All");
+    }
 
     private T Get<T>(T fallback, [CallerMemberName] string key = "")
     {

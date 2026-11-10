@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using ZeroFileCommander.Services;
 
 namespace ZeroFileCommander;
 
@@ -9,6 +10,20 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+
+        // Beklenmeyen hatalar uygulamayı kapatmasın; günlüğe yazılsın.
+        UnhandledException += (_, e) =>
+        {
+            CrashLog.Write("UI", e.Exception);
+            e.Handled = true;
+        };
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            CrashLog.Write("Task", e.Exception);
+            e.SetObserved();
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            CrashLog.Write("AppDomain", e.ExceptionObject as Exception);
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)

@@ -11,6 +11,7 @@ public enum FileKind
     Text,
     Archive,
     Executable,
+    Office,
 }
 
 public static class FileKinds
@@ -33,6 +34,8 @@ public static class FileKinds
             "cs", "xaml", "csproj", "sln", "js", "ts", "tsx", "jsx", "css", "scss", "html", "htm", "py", "ipynb", "sql",
             "ps1", "psm1", "bat", "cmd", "sh", "java", "kt", "swift", "go", "rs", "c", "cpp", "h", "hpp", "php", "rb",
             "r", "dax", "m", "gitignore", "editorconfig", "env");
+        Add(FileKind.Office, "doc", "docx", "docm", "dotx", "rtf", "odt", "xls", "xlsx", "xlsm", "xlsb", "ods",
+            "ppt", "pptx", "pptm", "ppsx", "odp", "vsd", "vsdx", "msg", "pub", "one");
         Add(FileKind.Archive, "zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "xz", "cab", "iso");
         Add(FileKind.Executable, "exe", "msi", "msix", "appx", "bat", "cmd", "ps1");
         // Betikler hem metin hem çalıştırılabilir; önizleme için metin olarak sayılır.
@@ -71,6 +74,7 @@ public static class FileKinds
         FileKind.Text => "Metin / kod",
         FileKind.Archive => "Arşiv",
         FileKind.Executable => "Uygulama",
+        FileKind.Office => "Office belgesi",
         _ => "Dosya",
     };
 
@@ -83,7 +87,8 @@ public static class FileKinds
         FileKind.Pdf => "",
         FileKind.Text => "",
         FileKind.Archive => "",
-        FileKind.Executable => "",
+        FileKind.Executable => "\uECAA",
+        FileKind.Office => "\uE8A5",
         _ => "",
     };
 }

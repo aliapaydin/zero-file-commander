@@ -20,6 +20,13 @@ public sealed partial class SettingsView : UserControl
         _ownerHwnd = ownerHwnd;
         InitializeComponent();
 
+        LoadValues();
+        _loading = false;
+    }
+
+    private void LoadValues()
+    {
+        _loading = true;
         ThemeChoice.SelectedIndex = (int)_settings.Theme;
         HoverToggle.IsOn = _settings.HoverPreview;
         HoverDelay.Value = _settings.HoverDelayMs;
@@ -33,6 +40,19 @@ public sealed partial class SettingsView : UserControl
         DownloadOptions.Visibility = _settings.DownloadsEnabled ? Visibility.Visible : Visibility.Collapsed;
 
         _loading = false;
+    }
+
+    private void ResetLayout_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ResetLayout();
+        ResetStatus.Text = "Yerleşim varsayılana döndü.";
+    }
+
+    private void ResetAll_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ResetAll();
+        LoadValues();
+        ResetStatus.Text = "Tüm ayarlar varsayılana döndü.";
     }
 
     private void ThemeChoice_SelectionChanged(object sender, SelectionChangedEventArgs e)

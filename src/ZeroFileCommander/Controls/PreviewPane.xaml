@@ -10,7 +10,7 @@
         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
         BorderThickness="1"
         CornerRadius="10">
-        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12">
+        <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10">
             <Grid ColumnDefinitions="*,Auto">
                 <TextBlock
                     Text="ÖNİZLEME"
@@ -35,7 +35,17 @@
                 Grid.Row="1"
                 CornerRadius="8"
                 Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                <Image x:Name="PreviewImage" Stretch="Uniform" Margin="6" Visibility="Collapsed" />
+                <ScrollViewer
+                    x:Name="ImageScroller"
+                    Visibility="Collapsed"
+                    ZoomMode="Enabled"
+                    MinZoomFactor="1"
+                    MaxZoomFactor="6"
+                    HorizontalScrollBarVisibility="Auto"
+                    HorizontalScrollMode="Auto"
+                    PointerWheelChanged="ImageScroller_PointerWheelChanged">
+                    <Image x:Name="PreviewImage" Stretch="Uniform" Margin="6" />
+                </ScrollViewer>
                 <MediaPlayerElement
                     x:Name="Player"
                     AreTransportControlsEnabled="True"
@@ -53,6 +63,8 @@
                         FontSize="12"
                         IsTextSelectionEnabled="True" />
                 </ScrollViewer>
+                <!-- Office vb. için Windows önizleyicisinin çizdiği alan -->
+                <Border x:Name="HandlerSurface" Visibility="Collapsed" Background="White" />
                 <StackPanel
                     x:Name="Placeholder"
                     Spacing="10"
@@ -70,7 +82,18 @@
                 <ProgressRing x:Name="LoadingRing" Width="28" Height="28" IsActive="False" />
             </Grid>
 
-            <StackPanel Grid.Row="2" Spacing="4">
+            <!-- PDF sayfa gezintisi -->
+            <Grid x:Name="PageBar" Grid.Row="2" Visibility="Collapsed" ColumnSpacing="6" ColumnDefinitions="Auto,*,Auto">
+                <Button Click="PrevPage_Click" ToolTipService.ToolTip="Önceki sayfa" AutomationProperties.Name="Önceki sayfa">
+                    <FontIcon Glyph="&#xE76B;" FontSize="12" />
+                </Button>
+                <TextBlock x:Name="PageText" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+                <Button Grid.Column="2" Click="NextPage_Click" ToolTipService.ToolTip="Sonraki sayfa" AutomationProperties.Name="Sonraki sayfa">
+                    <FontIcon Glyph="&#xE76C;" FontSize="12" />
+                </Button>
+            </Grid>
+
+            <StackPanel Grid.Row="3" Spacing="4">
                 <TextBlock x:Name="NameText" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" MaxLines="2" />
                 <TextBlock x:Name="KindText" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4" Margin="0,6,0,0">

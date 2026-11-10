@@ -19,25 +19,54 @@ public static class Notifier
     private const int LogicalWidth = 380;
     private const int LogicalHeight = 132;
     private const int Margin = 16;
+    private const int SW_SHOWNOACTIVATE = 4;
     private static readonly List<Window> Open = new();
 
     public static void Show(string title, string message, string glyph = "", params NotificationAction[] actions)
     {
+        try
+        {
+            ShowCore(title, message, glyph, actions);
+        }
+        catch (Exception ex)
+        {
+            // Bildirim gösterilemese bile uygulama çalışmaya devam etmeli.
+            CrashLog.Write("Notifier", ex);
+        }
+    }
+
+    private static void ShowCore(string title, string message, string glyph, NotificationAction[] actions)
+    {
         var window = new Window { Title = title };
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-        double scale = GetDpiForWindow(hwnd) / 96.0;
+        double scale = Math.Max(1.0, GetDpiForWindow(hwnd) / 96.0);
 
         var appWindow = window.AppWindow;
         appWindow.IsShownInSwitchers = false;
-        if (appWindow.Presenter is OverlappedPresenter presenter)
+
+        var presenter = OverlappedPresenter.Create();
+        presenter.IsResizable = false;
+        presenter.IsMaximizable = false;
+        presenter.IsMinimizable = false;
+        presenter.IsAlwaysOnTop = true;
+        try
         {
             presenter.SetBorderAndTitleBar(true, false);
-            presenter.IsResizable = false;
-            presenter.IsMaximizable = false;
-            presenter.IsMinimizable = false;
-            presenter.IsAlwaysOnTop = true;
         }
-        window.SystemBackdrop = new DesktopAcrylicBackdrop();
+        catch (Exception ex)
+        {
+            CrashLog.Write("Notifier.SetBorderAndTitleBar", ex);
+        }
+        appWindow.SetPresenter(presenter);
+
+        try
+        {
+            window.SystemBackdrop = new DesktopAcrylicBackdrop();
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write("Notifier.Backdrop", ex);
+        }
 
         var root = BuildContent(window, title, message, glyph, actions);
         root.RequestedTheme = ThemeHelper.ToElementTheme(AppSettings.Current.Theme);
@@ -47,7 +76,9 @@ public static class Notifier
         int height = (int)(LogicalHeight * scale);
         Open.Add(window);
         appWindow.MoveAndResize(ComputeRect(width, height, Open.Count - 1, scale));
-        appWindow.Show(false);
+
+        // Odağı çalmadan göster.
+        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
 
         // Otomatik kapanma; fare üzerindeyken bekler.
         bool hovering = false;
@@ -68,11 +99,14 @@ public static class Notifier
 
     private static FrameworkElement BuildContent(Window window, string title, string message, string glyph, NotificationAction[] actions)
     {
+        var resources = Application.Current.Resources;
+
         var grid = new Grid
         {
             Padding = new Thickness(16, 14, 12, 14),
             ColumnSpacing = 14,
             RowSpacing = 10,
+            Background = new SolidColorBrush(Colors.Transparent),
         };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -86,13 +120,8 @@ public static class Notifier
             Height = 40,
             CornerRadius = new CornerRadius(10),
             VerticalAlignment = VerticalAlignment.Top,
-            Background = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"],
-            Child = new FontIcon
-            {
-                Glyph = glyph,
-                FontSize = 18,
-                Foreground = (Brush)Application.Current.Resources["TextOnAccentFillColorPrimaryBrush"],
-            },
+            Background = new SolidColorBrush(ColorHelper.FromArgb(0xFF, 0x1F, 0x6F, 0xD6)),
+            Child = new FontIcon { Glyph = glyph, FontSize = 18, Foreground = new SolidColorBrush(Colors.White) },
         };
         grid.Children.Add(badge);
 
@@ -100,7 +129,7 @@ public static class Notifier
         texts.Children.Add(new TextBlock
         {
             Text = title,
-            Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"],
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             TextTrimming = TextTrimming.CharacterEllipsis,
         });
         texts.Children.Add(new TextBlock
@@ -109,7 +138,7 @@ public static class Notifier
             TextWrapping = TextWrapping.Wrap,
             MaxLines = 2,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            Opacity = 0.8,
         });
         Grid.SetColumn(texts, 1);
         grid.Children.Add(texts);
@@ -122,7 +151,7 @@ public static class Notifier
             BorderThickness = new Thickness(0),
             VerticalAlignment = VerticalAlignment.Top,
         };
-        AutomationProperties_SetName(close, "Kapat");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(close, "Kapat");
         close.Click += (_, _) => Close(window);
         Grid.SetColumn(close, 2);
         grid.Children.Add(close);
@@ -133,10 +162,18 @@ public static class Notifier
             foreach (var action in actions)
             {
                 var button = new Button { Content = action.Label };
-                if (action.IsPrimary) button.Style = (Style)Application.Current.Resources["AccentButtonStyle"];
+                if (action.IsPrimary && resources.TryGetValue("AccentButtonStyle", out var style) && style is Style s)
+                    button.Style = s;
                 button.Click += (_, _) =>
                 {
-                    action.Action();
+                    try
+                    {
+                        action.Action();
+                    }
+                    catch (Exception ex)
+                    {
+                        CrashLog.Write("Notifier.Action", ex);
+                    }
                     Close(window);
                 };
                 row.Children.Add(button);
@@ -148,9 +185,6 @@ public static class Notifier
 
         return grid;
     }
-
-    private static void AutomationProperties_SetName(DependencyObject element, string name) =>
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(element, name);
 
     private static RectInt32 ComputeRect(int width, int height, int index, double scale)
     {
@@ -176,20 +210,31 @@ public static class Notifier
     private static void Close(Window window)
     {
         if (!Open.Remove(window)) return;
-        window.Close();
+        try
+        {
+            window.Close();
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write("Notifier.Close", ex);
+        }
 
         // Kalanları yeniden diz.
         for (int i = 0; i < Open.Count; i++)
         {
             var w = Open[i];
             var size = w.AppWindow.Size;
-            double scale = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(w)) / 96.0;
-            w.AppWindow.Move(new PointInt32(ComputeRect(size.Width, size.Height, i, scale).X, ComputeRect(size.Width, size.Height, i, scale).Y));
+            double scale = Math.Max(1.0, GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(w)) / 96.0);
+            var rect = ComputeRect(size.Width, size.Height, i, scale);
+            w.AppWindow.Move(new PointInt32(rect.X, rect.Y));
         }
     }
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hwnd, int command);
 }
 
 public static class ThemeHelper

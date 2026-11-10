@@ -1,5 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Windows.Data.Pdf;
+using Windows.Foundation;
 using Windows.Media.Core;
 using Windows.Storage;
 using ZeroFileCommander.Models;
@@ -7,18 +10,31 @@ using ZeroFileCommander.Services;
 
 namespace ZeroFileCommander.Controls;
 
-/// <summary>Sağdaki önizleme paneli: görsel, PDF, metin/kod, ses ve video.</summary>
+/// <summary>
+/// Sağdaki önizleme paneli: görsel, PDF (sayfa sayfa), metin/kod, ses, video ve
+/// Windows önizleme işleyicisi olan her şey (Word, Excel, PowerPoint…).
+/// </summary>
 public sealed partial class PreviewPane : UserControl
 {
     private int _version;
     private FileItem? _current;
+    private PdfDocument? _pdf;
+    private uint _pdfPage;
+    private PreviewHandlerHost? _handlerHost;
+    private bool _handlerActive;
 
     public event EventHandler? CloseRequested;
 
     public PreviewPane()
     {
         InitializeComponent();
+        HandlerSurface.LayoutUpdated += (_, _) => PositionHandler();
+        Overlay.Changed += (_, _) => UpdateHandlerVisibility();
+        Unloaded += (_, _) => _handlerHost?.Dispose();
     }
+
+    /// <summary>Win32 önizleyicilerinin yerleşeceği ana pencere.</summary>
+    public IntPtr HostWindow { get; set; }
 
     public FileItem? Current => _current;
 
@@ -39,9 +55,7 @@ public sealed partial class PreviewPane : UserControl
         if (item is null || !item.IsEntry)
         {
             ShowPlaceholder("", "Bir dosya seç");
-            NameText.Text = string.Empty;
-            KindText.Text = string.Empty;
-            SizeText.Text = DateText.Text = ExtraText.Text = string.Empty;
+            NameText.Text = KindText.Text = SizeText.Text = DateText.Text = ExtraText.Text = string.Empty;
             return;
         }
 
@@ -63,21 +77,24 @@ public sealed partial class PreviewPane : UserControl
                     break;
 
                 case FileKind.Image:
-                    var image = await FilePreview.GetFullImageAsync(item.FullPath, 900);
+                    var image = await FilePreview.GetFullImageAsync(item.FullPath, 1200);
                     if (version != _version) return;
                     if (image is null) { ShowPlaceholder(item.Glyph, "Önizleme yok"); break; }
-                    PreviewImage.Source = image;
-                    PreviewImage.Visibility = Visibility.Visible;
-                    if (image.PixelWidth > 0) ExtraText.Text = $"{image.PixelWidth} × {image.PixelHeight}";
+                    ShowImage(image);
+                    if (image.PixelWidth > 0) ExtraText.Text = $"{image.PixelWidth} × {image.PixelHeight} · Ctrl+tekerlek: yakınlaştır";
                     break;
 
                 case FileKind.Pdf:
-                    var (page, count) = await FilePreview.RenderPdfAsync(item.FullPath, 900);
+                    var doc = await FilePreview.LoadPdfAsync(item.FullPath);
                     if (version != _version) return;
-                    if (page is null) { ShowPlaceholder(item.Glyph, "PDF açılamadı"); break; }
-                    PreviewImage.Source = page;
-                    PreviewImage.Visibility = Visibility.Visible;
-                    ExtraText.Text = $"{count} sayfa";
+                    if (doc is null || doc.PageCount == 0)
+                    {
+                        if (!TryOpenHandler(item)) ShowPlaceholder(item.Glyph, "PDF açılamadı");
+                        break;
+                    }
+                    _pdf = doc;
+                    _pdfPage = 0;
+                    await RenderPdfPageAsync(version);
                     break;
 
                 case FileKind.Audio:
@@ -105,22 +122,23 @@ public sealed partial class PreviewPane : UserControl
                     break;
 
                 default:
-                    var visual = await FilePreview.GetVisualAsync(item.FullPath, item.Kind, 256);
+                    // Office ve önizleyicisi kayıtlı diğer türler
+                    if (TryOpenHandler(item)) break;
+
+                    var visual = await FilePreview.GetVisualAsync(item.FullPath, item.Kind, 512);
                     if (version != _version) return;
                     if (visual is not null)
-                    {
-                        PreviewImage.Source = visual;
-                        PreviewImage.Visibility = Visibility.Visible;
-                    }
+                        ShowImage(visual);
                     else
-                    {
-                        ShowPlaceholder(item.Glyph, "Bu tür için önizleme yok");
-                    }
+                        ShowPlaceholder(item.Glyph, item.Kind == FileKind.Office
+                            ? "Bu belge için Windows önizleyicisi bulunamadı (Office kurulu mu?)"
+                            : "Bu tür için önizleme yok");
                     break;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            CrashLog.Write("PreviewPane " + item.Extension, ex);
             if (version == _version) ShowPlaceholder(item.Glyph, "Önizleme yüklenemedi");
         }
         finally
@@ -131,7 +149,7 @@ public sealed partial class PreviewPane : UserControl
 
     public void Play() => Player.MediaPlayer?.Play();
 
-    /// <summary>Çalan medyayı durdurur ve kaynakları bırakır.</summary>
+    /// <summary>Çalan medyayı durdurur, açık belgeleri bırakır (dosya kilitlenmesin).</summary>
     public void Stop()
     {
         try
@@ -144,6 +162,114 @@ public sealed partial class PreviewPane : UserControl
         }
         Player.Source = null;
         Player.PosterSource = null;
+        CloseHandler();
+        _pdf = null;
+    }
+
+    // ---------------------------------------------------------------- PDF
+
+    private async Task RenderPdfPageAsync(int version)
+    {
+        if (_pdf is null) return;
+        double width = Math.Max(600, Stage.ActualWidth * (XamlRoot?.RasterizationScale ?? 1) * 1.5);
+        var page = await FilePreview.RenderPageAsync(_pdf, _pdfPage, (uint)Math.Min(2400, width));
+        if (version != _version || page is null) return;
+        ShowImage(page);
+        PageBar.Visibility = _pdf.PageCount > 1 ? Visibility.Visible : Visibility.Collapsed;
+        PageText.Text = $"Sayfa {_pdfPage + 1} / {_pdf.PageCount}";
+        ExtraText.Text = $"{_pdf.PageCount} sayfa · tekerlek: sayfa değiştir";
+    }
+
+    private async void PrevPage_Click(object sender, RoutedEventArgs e) => await GoToPageAsync(-1);
+
+    private async void NextPage_Click(object sender, RoutedEventArgs e) => await GoToPageAsync(+1);
+
+    private async Task GoToPageAsync(int delta)
+    {
+        if (_pdf is null) return;
+        long target = Math.Clamp((long)_pdfPage + delta, 0, _pdf.PageCount - 1);
+        if (target == _pdfPage) return;
+        _pdfPage = (uint)target;
+        await RenderPdfPageAsync(_version);
+        ImageScroller.ChangeView(0, 0, 1, disableAnimation: true);
+    }
+
+    private async void ImageScroller_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        if (_pdf is null) return;
+        if (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control)) return; // yakınlaştırma
+        if (ImageScroller.ZoomFactor > 1.01f) return; // yakınken normal kaydırma
+
+        int delta = e.GetCurrentPoint(ImageScroller).Properties.MouseWheelDelta;
+        e.Handled = true;
+        await GoToPageAsync(delta < 0 ? +1 : -1);
+    }
+
+    // ---------------------------------------------------------------- Windows önizleyicisi
+
+    private bool TryOpenHandler(FileItem item)
+    {
+        if (HostWindow == IntPtr.Zero) return false;
+        var clsid = PreviewHandlerHost.FindHandler(Path.GetExtension(item.FullPath));
+        if (clsid is null) return false;
+
+        HandlerSurface.Visibility = Visibility.Visible;
+        HandlerSurface.UpdateLayout();
+        var (x, y, w, h) = SurfaceBounds();
+        _handlerHost ??= new PreviewHandlerHost(HostWindow);
+        _handlerActive = _handlerHost.Open(item.FullPath, clsid.Value, x, y, w, h);
+        if (!_handlerActive)
+        {
+            HandlerSurface.Visibility = Visibility.Collapsed;
+            return false;
+        }
+        ExtraText.Text = "Windows önizleyicisi · kaydırarak sayfalar arasında gez";
+        UpdateHandlerVisibility();
+        return true;
+    }
+
+    private void CloseHandler()
+    {
+        if (!_handlerActive) return;
+        _handlerActive = false;
+        _handlerHost?.Close();
+    }
+
+    private void PositionHandler()
+    {
+        if (!_handlerActive || _handlerHost is null) return;
+        var (x, y, w, h) = SurfaceBounds();
+        _handlerHost.SetBounds(x, y, w, h);
+    }
+
+    private void UpdateHandlerVisibility()
+    {
+        if (_handlerHost is null) return;
+        bool visible = _handlerActive && !Overlay.IsOpen && Visibility == Visibility.Visible && HandlerSurface.Visibility == Visibility.Visible;
+        _handlerHost.SetVisible(visible);
+    }
+
+    private (int X, int Y, int Width, int Height) SurfaceBounds()
+    {
+        if (XamlRoot is null) return (0, 0, 1, 1);
+        double scale = XamlRoot.RasterizationScale;
+        var origin = HandlerSurface.TransformToVisual(null).TransformPoint(new Point(0, 0));
+        return (
+            (int)Math.Round(origin.X * scale),
+            (int)Math.Round(origin.Y * scale),
+            Math.Max(1, (int)Math.Round(HandlerSurface.ActualWidth * scale)),
+            Math.Max(1, (int)Math.Round(HandlerSurface.ActualHeight * scale)));
+    }
+
+    /// <summary>Panel gizlenip gösterildiğinde ana pencere çağırır.</summary>
+    public void OnVisibilityChanged() => UpdateHandlerVisibility();
+
+    // ---------------------------------------------------------------- Yardımcılar
+
+    private void ShowImage(Microsoft.UI.Xaml.Media.ImageSource source)
+    {
+        PreviewImage.Source = source;
+        ImageScroller.Visibility = Visibility.Visible;
     }
 
     private void Reset()
@@ -151,9 +277,12 @@ public sealed partial class PreviewPane : UserControl
         Stop();
         Player.Visibility = Visibility.Collapsed;
         PreviewImage.Source = null;
-        PreviewImage.Visibility = Visibility.Collapsed;
+        ImageScroller.Visibility = Visibility.Collapsed;
+        ImageScroller.ChangeView(0, 0, 1, disableAnimation: true);
         PreviewText.Text = string.Empty;
         TextScroller.Visibility = Visibility.Collapsed;
+        HandlerSurface.Visibility = Visibility.Collapsed;
+        PageBar.Visibility = Visibility.Collapsed;
         Placeholder.Visibility = Visibility.Collapsed;
         LoadingRing.IsActive = false;
     }

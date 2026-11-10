@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window, IPaneHost
     private readonly DispatcherQueueTimer _previewTimer;
     private readonly TaskbarProgress _taskbar;
     private readonly TrayIcon _tray;
+    private readonly WindowPlacement _placement;
     private FilePane _active;
     private DownloadsWindow? _downloadsWindow;
     private bool _canPaste;
@@ -37,7 +38,9 @@ public sealed partial class MainWindow : Window, IPaneHost
         SetTitleBar(AppTitleBar);
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
         AppWindow.SetIcon(iconPath);
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(1480, 900));
+        _placement = new WindowPlacement(AppWindow, DispatcherQueue,
+            () => _settings.MainWindowBounds, value => _settings.MainWindowBounds = value);
+        _placement.Restore(new Windows.Graphics.SizeInt32(1480, 900));
 
         // Paneller
         _active = LeftPane;
@@ -48,6 +51,23 @@ public sealed partial class MainWindow : Window, IPaneHost
             pane.SelectionChangedEx += Pane_SelectionChanged;
         }
         Preview.CloseRequested += (_, _) => _settings.ShowPreviewPane = false;
+        Preview.HostWindow = WinRT.Interop.WindowNative.GetWindowHandle(this);
+
+        // Ayırıcılar
+        TreeSplitter.Dragged += (_, dx) => TreeColumn.Width = new GridLength(Math.Clamp(TreeColumn.Width.Value + dx, 160, 600));
+        TreeSplitter.DragCompleted += (_, _) => _settings.TreeWidth = TreeColumn.Width.Value;
+        TreeSplitter.ResetRequested += (_, _) => TreeColumn.Width = new GridLength(250);
+        PreviewSplitter.Dragged += (_, dx) => PreviewColumn.Width = new GridLength(Math.Clamp(PreviewColumn.Width.Value - dx, 240, 1200));
+        PreviewSplitter.DragCompleted += (_, _) => _settings.PreviewWidth = PreviewColumn.Width.Value;
+        PreviewSplitter.ResetRequested += (_, _) => PreviewColumn.Width = new GridLength(360);
+        MiddleSplitter.Dragged += (_, dx) => ResizePanes(dx);
+        MiddleSplitter.DragCompleted += (_, _) => _settings.LeftRatio = CurrentLeftRatio();
+        MiddleSplitter.ResetRequested += (_, _) => SetLeftRatio(0.5);
+
+        // "Yeni" menüleri
+        NewMenu.Populate(RibbonNewMenu.Items, entry => _ = CreateNewAsync(_active, entry));
+        NewMenu.Populate(MenuNew.Items, entry => _ = CreateNewAsync(_active, entry));
+        Overlay.Track(RibbonNewMenu);
 
         _previewTimer = DispatcherQueue.CreateTimer();
         _previewTimer.Interval = TimeSpan.FromMilliseconds(160);
@@ -73,11 +93,13 @@ public sealed partial class MainWindow : Window, IPaneHost
         AppWindow.Changed += AppWindow_Changed;
         _settings.Changed += Settings_Changed;
 
-        LeftPane.Navigate(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-        RightPane.Navigate(string.Empty);
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        LeftPane.Navigate(Directory.Exists(_settings.LeftPath) ? _settings.LeftPath : home);
+        RightPane.Navigate(Directory.Exists(_settings.RightPath) ? _settings.RightPath : string.Empty);
         SetActive(LeftPane);
         LeftPane.FocusList();
 
+        SetLeftRatio(_settings.LeftRatio);
         ApplyAllSettings();
         UpdateRibbon();
     }
@@ -316,6 +338,12 @@ public sealed partial class MainWindow : Window, IPaneHost
                 break;
             case "app:focusleft": SetActive(LeftPane); LeftPane.FocusList(); break;
             case "app:focusright": SetActive(RightPane); RightPane.FocusList(); break;
+            case "app:resetlayout": ResetLayout(); break;
+            case "app:log":
+                Directory.CreateDirectory(CrashLog.FolderPath);
+                if (!File.Exists(CrashLog.FilePath)) File.WriteAllText(CrashLog.FilePath, "Henüz kayıtlı hata yok.\r\n");
+                ShellActions.Open(CrashLog.FilePath);
+                break;
             default:
                 if (tag.StartsWith("app:theme:") && int.TryParse(tag["app:theme:".Length..], out var theme))
                     _settings.Theme = (AppTheme)theme;
@@ -415,7 +443,8 @@ public sealed partial class MainWindow : Window, IPaneHost
     private async Task NewFolderAsync(FilePane pane)
     {
         if (pane.IsDriveList) return;
-        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "Yeni klasör", "Yeni klasör", "Oluştur");
+        var suggested = Path.GetFileName(ShellNew.UniquePath(Path.Combine(pane.CurrentPath, "Yeni klasör")));
+        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "Yeni klasör", suggested, "Oluştur");
         if (name is null) return;
         Directory.CreateDirectory(Path.Combine(pane.CurrentPath, name));
         pane.Refresh();
@@ -572,6 +601,11 @@ public sealed partial class MainWindow : Window, IPaneHost
     {
         DispatcherQueue.TryEnqueue(() =>
         {
+            if (name is "Layout" or "All")
+            {
+                _placement.Restore(new Windows.Graphics.SizeInt32(1480, 900));
+                SetLeftRatio(_settings.LeftRatio);
+            }
             ApplyAllSettings();
             if (name == nameof(AppSettings.DownloadsEnabled)) UpdateDownloadIndicators();
         });
@@ -595,13 +629,18 @@ public sealed partial class MainWindow : Window, IPaneHost
         bool tree = _settings.ShowFolderTree;
         if (tree) BuildTreeRoots();
         TreeHost.Visibility = tree ? Visibility.Visible : Visibility.Collapsed;
-        TreeColumn.Width = tree ? new GridLength(250) : new GridLength(0);
+        TreeSplitter.Visibility = tree ? Visibility.Visible : Visibility.Collapsed;
+        TreeColumn.Width = tree ? new GridLength(Math.Clamp(_settings.TreeWidth, 160, 600)) : new GridLength(0);
+        TreeSplitColumn.Width = tree ? new GridLength(8) : new GridLength(0);
         MenuShowTree.IsChecked = tree;
 
         bool preview = _settings.ShowPreviewPane;
         bool wasVisible = Preview.Visibility == Visibility.Visible;
         Preview.Visibility = preview ? Visibility.Visible : Visibility.Collapsed;
-        PreviewColumn.Width = preview ? new GridLength(360) : new GridLength(0);
+        PreviewSplitter.Visibility = preview ? Visibility.Visible : Visibility.Collapsed;
+        PreviewColumn.Width = preview ? new GridLength(Math.Clamp(_settings.PreviewWidth, 240, 1200)) : new GridLength(0);
+        PreviewSplitColumn.Width = preview ? new GridLength(8) : new GridLength(0);
+        Preview.OnVisibilityChanged();
         MenuShowPreview.IsChecked = preview;
         if (!preview && wasVisible) Preview.Stop();
         if (preview && !wasVisible) _ = UpdatePreviewAsync(autoPlay: false);
@@ -724,6 +763,75 @@ public sealed partial class MainWindow : Window, IPaneHost
             new NotificationAction("Klasörde göster", () => ShellActions.ShowInExplorer(item.FilePath)));
     }
 
+    // ================================================================ Yerleşim
+
+    private void ResizePanes(double dx)
+    {
+        double left = LeftPane.ActualWidth;
+        double right = RightPane.ActualWidth;
+        double total = left + right;
+        if (total <= 0) return;
+        double newLeft = Math.Clamp(left + dx, 220, total - 220);
+        LeftColumn.Width = new GridLength(newLeft, GridUnitType.Star);
+        RightColumn.Width = new GridLength(total - newLeft, GridUnitType.Star);
+    }
+
+    private double CurrentLeftRatio()
+    {
+        double total = LeftColumn.Width.Value + RightColumn.Width.Value;
+        return total <= 0 ? 0.5 : LeftColumn.Width.Value / total;
+    }
+
+    private void SetLeftRatio(double ratio)
+    {
+        ratio = Math.Clamp(ratio, 0.15, 0.85);
+        LeftColumn.Width = new GridLength(ratio, GridUnitType.Star);
+        RightColumn.Width = new GridLength(1 - ratio, GridUnitType.Star);
+    }
+
+    private void ResetLayout()
+    {
+        _settings.ResetLayout(); // Settings_Changed yeniden uygular
+    }
+
+    private void SaveSession()
+    {
+        _placement.Save();
+        _settings.LeftPath = LeftPane.CurrentPath;
+        _settings.RightPath = RightPane.CurrentPath;
+    }
+
+    public async Task CreateNewAsync(FilePane pane, ShellNewEntry? entry)
+    {
+        if (pane.IsDriveList) return;
+        if (entry is null)
+        {
+            await NewFolderAsync(pane);
+            return;
+        }
+
+        var suggested = Path.GetFileName(ShellNew.UniquePath(Path.Combine(pane.CurrentPath, entry.BaseName + entry.Extension)));
+        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, $"Yeni {entry.DisplayName}", suggested, "Oluştur", selectStem: true);
+        if (name is null) return;
+        if (!name.EndsWith(entry.Extension, StringComparison.OrdinalIgnoreCase)) name += entry.Extension;
+        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Geçersiz ad", "Ad şu karakterleri içeremez: \\ / : * ? \" < > |");
+            return;
+        }
+
+        try
+        {
+            var path = ShellNew.Create(entry, pane.CurrentPath, name);
+            pane.Refresh();
+            pane.SelectByName(Path.GetFileName(path));
+        }
+        catch (Exception ex)
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Dosya oluşturulamadı", ex.Message);
+        }
+    }
+
     // ================================================================ Tepsi ve pencere yaşam döngüsü
 
     private IReadOnlyList<TrayMenuItem> BuildTrayMenu()
@@ -755,6 +863,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void HideToTray()
     {
+        SaveSession();
         _tray.Show();
         Preview.Stop();
         AppWindow.Hide();
@@ -800,6 +909,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         foreach (var item in DownloadManager.Current.Items.Where(i => i.State == DownloadState.Downloading).ToList())
             DownloadManager.Current.Pause(item);
 
+        SaveSession();
         Clipboard.ContentChanged -= Clipboard_ContentChanged;
         _taskbar.Set(null);
         _tray.Dispose();

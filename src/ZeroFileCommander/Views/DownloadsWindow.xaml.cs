@@ -19,7 +19,10 @@ public sealed partial class DownloadsWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarArea);
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(760, 620));
+        var placement = new WindowPlacement(AppWindow, DispatcherQueue,
+            () => AppSettings.Current.DownloadsWindowBounds, value => AppSettings.Current.DownloadsWindowBounds = value);
+        placement.Restore(new Windows.Graphics.SizeInt32(760, 620));
+        AppWindow.Closing += (_, _) => placement.Save();
 
         RootGrid.RequestedTheme = ThemeHelper.ToElementTheme(AppSettings.Current.Theme);
         FolderText.Text = AppSettings.Current.DownloadFolder;

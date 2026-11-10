@@ -31,4 +31,7 @@ public interface IPaneHost
     void Execute(PaneCommand command, FilePane pane);
 
     Task DropFilesAsync(FilePane target, IReadOnlyList<string> paths, bool copy);
+
+    /// <summary>Panelin klasöründe yeni klasör (<paramref name="entry"/> null) ya da dosya oluşturur.</summary>
+    Task CreateNewAsync(FilePane pane, Services.ShellNewEntry? entry);
 }
