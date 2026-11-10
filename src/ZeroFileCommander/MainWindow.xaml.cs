@@ -21,7 +21,12 @@ public sealed partial class MainWindow : Window, IPaneHost
     private readonly AppSettings _settings = AppSettings.Current;
     private readonly DispatcherQueueTimer _previewTimer;
     private readonly TaskbarProgress _taskbar;
-    private readonly TrayIcon _tray;
+    private readonly TrayIcon? _tray;
+    private readonly bool _isPrimary;
+    private static TransfersWindow? _transfersWindow;
+
+    /// <summary>Açık tüm ana pencereler (ilki birincil: tepsi, indirmeler, ayar kaydı onda).</summary>
+    public static List<MainWindow> All { get; } = new();
     private readonly WindowPlacement _placement;
     private FilePane _active;
     private DownloadsWindow? _downloadsWindow;
@@ -36,16 +41,21 @@ public sealed partial class MainWindow : Window, IPaneHost
     private List<(string NewPath, string OldPath)>? _lastRename;
     private SearchWindow? _searchWindow;
 
-    public MainWindow()
+    public MainWindow() : this(true, null, null) { }
+
+    public MainWindow(bool isPrimary, string? leftPath, string? rightPath)
     {
+        _isPrimary = isPrimary;
         InitializeComponent();
+        All.Add(this);
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
         AppWindow.SetIcon(iconPath);
-        _placement = new WindowPlacement(AppWindow, DispatcherQueue,
-            () => _settings.MainWindowBounds, value => _settings.MainWindowBounds = value);
+        _placement = isPrimary
+            ? new WindowPlacement(AppWindow, DispatcherQueue, () => _settings.MainWindowBounds, value => _settings.MainWindowBounds = value)
+            : new WindowPlacement(AppWindow, DispatcherQueue, () => string.Empty, _ => { });
         _placement.Restore(new Windows.Graphics.SizeInt32(1480, 900));
 
         // Paneller
@@ -87,13 +97,30 @@ public sealed partial class MainWindow : Window, IPaneHost
         // Görev çubuğu, tepsi, indirmeler
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         _taskbar = new TaskbarProgress(hwnd);
-        _tray = new TrayIcon(hwnd, iconPath, "Zero File Commander") { MenuProvider = BuildTrayMenu };
-        _tray.OpenRequested += (_, _) => ShowFromTray();
-        if (_settings.RunInBackground) _tray.Show();
+        if (isPrimary)
+        {
+            _tray = new TrayIcon(hwnd, iconPath, "Zero File Commander") { MenuProvider = BuildTrayMenu };
+            _tray.OpenRequested += (_, _) => ShowFromTray();
+            if (_settings.RunInBackground) _tray.Show();
 
-        DownloadManager.Current.Attach(DispatcherQueue);
-        DownloadManager.Current.ProgressChanged += (_, _) => UpdateDownloadIndicators();
-        DownloadManager.Current.Completed += Download_Completed;
+            DownloadManager.Current.Attach(DispatcherQueue);
+            DownloadManager.Current.ProgressChanged += (_, _) => UpdateDownloadIndicators();
+            DownloadManager.Current.Completed += Download_Completed;
+
+            TransferManager.Current.Attach(DispatcherQueue);
+            TransferManager.Current.JobFinished += Transfer_JobFinishedNotify;
+            TransferManager.Current.ConflictsWaiting += Transfer_ConflictsWaiting;
+        }
+        TransferManager.Current.ProgressChanged += Transfer_ProgressChanged;
+        TransferManager.Current.JobFinished += Transfer_JobFinishedRefresh;
+        Closed += (_, _) =>
+        {
+            TransferManager.Current.ProgressChanged -= Transfer_ProgressChanged;
+            TransferManager.Current.JobFinished -= Transfer_JobFinishedRefresh;
+            _settings.Changed -= Settings_Changed;
+            Clipboard.ContentChanged -= Clipboard_ContentChanged;
+            All.Remove(this);
+        };
 
         AppWindow.Closing += AppWindow_Closing;
         AppWindow.Changed += AppWindow_Changed;
@@ -101,10 +128,22 @@ public sealed partial class MainWindow : Window, IPaneHost
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         _history.AddRange(_settings.GetString("Pane.History").Split('\n', StringSplitOptions.RemoveEmptyEntries));
-        LeftPane.SettingsKey = "Left";
-        RightPane.SettingsKey = "Right";
-        LeftPane.Restore(Directory.Exists(_settings.LeftPath) ? _settings.LeftPath : home);
-        RightPane.Restore(Directory.Exists(_settings.RightPath) ? _settings.RightPath : string.Empty);
+        if (isPrimary)
+        {
+            LeftPane.SettingsKey = "Left";
+            RightPane.SettingsKey = "Right";
+            LeftPane.Restore(Directory.Exists(_settings.LeftPath) ? _settings.LeftPath : home);
+            RightPane.Restore(Directory.Exists(_settings.RightPath) ? _settings.RightPath : string.Empty);
+        }
+        else
+        {
+            // Ek pencereler sekmelerini kaydetmez; açıldığı yerden başlar.
+            LeftPane.SettingsKey = "Extra.Left";
+            RightPane.SettingsKey = "Extra.Right";
+            LeftPane.Restore(leftPath ?? home);
+            RightPane.Restore(rightPath ?? string.Empty);
+            Title = "Zero File Commander · " + All.Count;
+        }
         SetActive(LeftPane);
         LeftPane.FocusList();
 
@@ -114,6 +153,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
         Activated += (_, e) =>
         {
+            _windowActive = e.WindowActivationState != WindowActivationState.Deactivated;
             if (e.WindowActivationState != WindowActivationState.Deactivated) _ = RefreshDrivesAsync();
         };
         _ = RefreshDrivesAsync(force: true);
@@ -253,6 +293,9 @@ public sealed partial class MainWindow : Window, IPaneHost
             VirtualKey.W when ctrl => "app:closetab",
             VirtualKey.L when ctrl => "app:editpath",
             VirtualKey.K when ctrl => "app:palette",
+            VirtualKey.N when ctrl => "app:newwindow",
+            VirtualKey.Right when ctrl && shift => "app:sendtowindow",
+            VirtualKey.S when ctrl && shift => "app:shelf",
             VirtualKey.P when ctrl && shift => "app:palette",
             VirtualKey.M when ctrl => "app:batchrename",
             VirtualKey.F when ctrl && shift => "app:search",
@@ -398,6 +441,12 @@ public sealed partial class MainWindow : Window, IPaneHost
                 case PaneCommand.Compress:
                     await CompressAsync(pane, selection);
                     break;
+                case PaneCommand.AddToShelf when selection.Count > 0 && !pane.IsInArchive:
+                    ShelfWindow.Add(selection.Select(i => i.FullPath));
+                    break;
+                case PaneCommand.SendToWindow:
+                    await SendToOtherWindowAsync();
+                    break;
                 case PaneCommand.ExtractHere when target is { Kind: FileKind.Archive, IsInArchive: false }:
                     await ExtractArchiveAsync(target, pane, pane);
                     break;
@@ -442,6 +491,10 @@ public sealed partial class MainWindow : Window, IPaneHost
             case "app:focusright": SetActive(RightPane); RightPane.FocusList(); break;
             case "app:resetlayout": ResetLayout(); break;
             case "app:palette": OpenPalette(); break;
+            case "app:transfers": ShowTransfers(); break;
+            case "app:newwindow": OpenNewWindow(); break;
+            case "app:sendtowindow": await SendToOtherWindowAsync(); break;
+            case "app:shelf": ShelfWindow.Toggle(); break;
             case "app:batchrename": await BatchRenameAsync(_active); break;
             case "app:undorename": await UndoRenameAsync(); break;
             case "app:search": OpenSearch(); break;
@@ -518,13 +571,12 @@ public sealed partial class MainWindow : Window, IPaneHost
             return;
         }
 
-        if (move) Preview.Stop(); // taşınan medya dosyası kilitli kalmasın
-        _ = move
-            ? await ShellFileOperations.MoveAsync(Hwnd, sources, target.CurrentPath)
-            : await ShellFileOperations.CopyAsync(Hwnd, sources, target.CurrentPath);
-
-        source.Refresh();
-        target.Refresh();
+        await QueueOrShellAsync(move, sources, target.CurrentPath);
+        if (!_settings.UseTransferQueue)
+        {
+            source.Refresh();
+            target.Refresh();
+        }
     }
 
     /// <summary>Çakışma varsa sorar: üzerine yaz / atla / vazgeç (null).</summary>
@@ -608,14 +660,13 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (incoming.Count == 0) return;
 
         SetActive(target);
-        if (!copy) Preview.Stop();
-        _ = copy
-            ? await ShellFileOperations.CopyAsync(Hwnd, incoming, target.CurrentPath)
-            : await ShellFileOperations.MoveAsync(Hwnd, incoming, target.CurrentPath);
-
-        LeftPane.Refresh();
-        RightPane.Refresh();
-        if (incoming.Count == 1) target.SelectByName(Path.GetFileName(incoming[0].TrimEnd('\\')));
+        await QueueOrShellAsync(!copy, incoming, target.CurrentPath);
+        if (!_settings.UseTransferQueue)
+        {
+            LeftPane.Refresh();
+            RightPane.Refresh();
+            if (incoming.Count == 1) target.SelectByName(Path.GetFileName(incoming[0].TrimEnd('\\')));
+        }
     }
 
     private async Task PasteAsync(FilePane pane)
@@ -632,14 +683,13 @@ public sealed partial class MainWindow : Window, IPaneHost
             return;
         }
 
-        if (files.IsCut) Preview.Stop();
-        bool ok = files.IsCut
-            ? await ShellFileOperations.MoveAsync(Hwnd, files.Paths, pane.CurrentPath)
-            : await ShellFileOperations.CopyAsync(Hwnd, files.Paths, pane.CurrentPath);
+        bool ok = await QueueOrShellAsync(files.IsCut, files.Paths, pane.CurrentPath);
         if (ok && files.IsCut) ClipboardService.Clear();
-
-        LeftPane.Refresh();
-        RightPane.Refresh();
+        if (!_settings.UseTransferQueue)
+        {
+            LeftPane.Refresh();
+            RightPane.Refresh();
+        }
     }
 
     private async Task RenameAsync(FilePane pane, FileItem item)
@@ -899,8 +949,8 @@ public sealed partial class MainWindow : Window, IPaneHost
         MenuDownloads.IsEnabled = true;
 
         // Tepsi
-        if (_settings.RunInBackground || _settings.MinimizeToTray) _tray.Show();
-        else _tray.Hide();
+        if (_settings.RunInBackground || _settings.MinimizeToTray) _tray?.Show();
+        else _tray?.Hide();
     }
 
     private void RootGrid_ActualThemeChanged(FrameworkElement sender, object args) => ApplyTitleBarColors();
@@ -931,7 +981,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         _canPaste = ClipboardService.HasFiles();
         UpdateRibbon();
 
-        if (!_settings.DownloadsEnabled || !_settings.CaptureClipboardLinks) return;
+        if (!_isPrimary || !_settings.DownloadsEnabled || !_settings.CaptureClipboardLinks) return;
         var text = (await ClipboardService.GetTextAsync())?.Trim();
         if (!DownloadManager.LooksLikeDownloadUrl(text) || text == _lastCapturedUrl) return;
         _lastCapturedUrl = text;
@@ -985,7 +1035,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         double? progress = manager.TotalProgress;
         int active = manager.ActiveCount;
 
-        _taskbar.Set(progress);
+        UpdateTaskbar();
 
         bool show = _settings.DownloadsEnabled && active > 0;
         DownloadIndicator.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
@@ -997,7 +1047,7 @@ public sealed partial class MainWindow : Window, IPaneHost
             DownloadIndicatorBar.Value = unknown || progress is null ? 0 : progress.Value * 100;
         }
 
-        _tray.SetTooltip(active > 0 && progress is double t && !double.IsNaN(t)
+        _tray?.SetTooltip(active > 0 && progress is double t && !double.IsNaN(t)
             ? $"Zero File Commander · {active} indirme · %{t * 100:0}"
             : "Zero File Commander");
     }
@@ -1177,6 +1227,11 @@ public sealed partial class MainWindow : Window, IPaneHost
         ("app:theme:1", "Tema: aydınlık", "\uE706", ""),
         ("app:theme:2", "Tema: karanlık", "\uE708", ""),
         ("app:downloads", "İndirmeler", "\uE896", "Ctrl+J"),
+        ("app:transfers", "Aktarımlar (kopyalama kuyruğu)", "\uE8C8", ""),
+        ("app:newwindow", "Yeni pencere", "\uE78B", "Ctrl+N"),
+        ("app:sendtowindow", "Diğer pencereye kopyala", "\uE8A7", "Ctrl+Shift+→"),
+        ("app:shelf", "Rafı aç/kapat", "\uE7B8", "Ctrl+Shift+S"),
+        ("AddToShelf", "Rafa ekle", "\uE7B8", ""),
         ("app:settings", "Ayarlar", "\uE713", "Ctrl+,"),
         ("app:resetlayout", "Panel yerleşimini sıfırla", "\uE7A7", ""),
         ("app:shortcuts", "Klavye kısayolları", "\uE765", "F1"),
@@ -1332,6 +1387,130 @@ public sealed partial class MainWindow : Window, IPaneHost
         _searchWindow.Activate();
     }
 
+    // ================================================================ Faz 3: aktarımlar, pencereler, raf
+
+    public static MainWindow? Primary => All.FirstOrDefault(w => w._isPrimary);
+
+    private void Transfer_ProgressChanged(object? sender, EventArgs e) => UpdateTransferIndicators();
+
+    private void UpdateTransferIndicators()
+    {
+        var manager = TransferManager.Current;
+        int active = manager.ActiveCount;
+        double? progress = manager.TotalProgress;
+        TransferIndicator.Visibility = active > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (active > 0)
+        {
+            bool waiting = manager.Jobs.Any(j => j.State == TransferState.WaitingForConflicts);
+            TransferIndicatorText.Text = waiting ? "Çakışma bekliyor" : active == 1 ? "1 aktarım" : $"{active} aktarım";
+            bool unknown = progress is null || double.IsNaN(progress.Value);
+            TransferIndicatorBar.IsIndeterminate = unknown;
+            TransferIndicatorBar.ShowPaused = waiting || manager.Jobs.Any(j => j.State == TransferState.Paused);
+            TransferIndicatorBar.Value = unknown ? 0 : progress!.Value * 100;
+        }
+        UpdateTaskbar();
+    }
+
+    /// <summary>Görev çubuğu: indirmeler ve aktarımların ortak ilerlemesi.</summary>
+    private void UpdateTaskbar()
+    {
+        var parts = new[] { _isPrimary ? DownloadManager.Current.TotalProgress : null, TransferManager.Current.TotalProgress }
+            .Where(p => p is not null).Select(p => p!.Value).ToList();
+        double? value = parts.Count == 0 ? null : parts.Any(double.IsNaN) ? double.NaN : parts.Average();
+        bool paused = TransferManager.Current.Jobs.Any(j => j.State is TransferState.Paused or TransferState.WaitingForConflicts);
+        _taskbar.Set(value, paused);
+    }
+
+    private void Transfer_JobFinishedRefresh(object? sender, TransferJob job)
+    {
+        LeftPane.Refresh();
+        RightPane.Refresh();
+    }
+
+    private void Transfer_JobFinishedNotify(object? sender, TransferJob job)
+    {
+        bool slow = (DateTime.Now - job.Created).TotalSeconds > 5;
+        bool focused = All.Any(w => w.AppWindow.IsVisible && w._windowActive);
+        if (job.State == TransferState.Canceled) return;
+        if (job.State == TransferState.CompletedWithErrors)
+        {
+            Notifier.Show(job.Kind == TransferKind.Copy ? "Kopyalama hatalarla bitti" : "Taşıma hatalarla bitti",
+                $"{job.FilesDone} dosya tamam, {job.ErrorCount} hata", "\uE7BA",
+                new NotificationAction("Ayrıntılar", () => ShowTransfers(), IsPrimary: true));
+            return;
+        }
+        if (!slow && focused) return; // kısa işler için bildirim gürültü olur
+        Notifier.Show(job.Kind == TransferKind.Copy ? "Kopyalama tamamlandı" : "Taşıma tamamlandı",
+            $"{job.FilesDone} dosya · {Models.FileItem.FormatSize(job.BytesDone)} → {Path.GetFileName(job.Target.TrimEnd('\\'))}", "\uE8FB",
+            new NotificationAction("Klasörü aç", () => { ShowFromTray(); _active.Navigate(job.Target); }, IsPrimary: true));
+    }
+
+    private void Transfer_ConflictsWaiting(object? sender, TransferJob job)
+    {
+        Notifier.Show("Bazı dosyalar hedefte zaten var",
+            $"{job.ConflictCount} dosya bekliyor; diğerleri kopyalandı.", "\uE7BA",
+            new NotificationAction("Daha yeniyse değiştir", () => TransferManager.Current.ResolveConflicts(job, ConflictPolicy.OverwriteIfNewer), IsPrimary: true),
+            new NotificationAction("Atla", () => TransferManager.Current.ResolveConflicts(job, ConflictPolicy.Skip)),
+            new NotificationAction("Seçenekler…", () => ShowTransfers()));
+    }
+
+    private bool _windowActive;
+
+    private static void ShowTransfers()
+    {
+        if (_transfersWindow is null)
+        {
+            _transfersWindow = new TransfersWindow();
+            _transfersWindow.Closed += (_, _) => _transfersWindow = null;
+        }
+        _transfersWindow.Activate();
+    }
+
+    /// <summary>Kuyruğa ekler; kuyruk kapalıysa Windows'un kopyalama penceresini kullanır.</summary>
+    private async Task<bool> QueueOrShellAsync(bool move, IReadOnlyList<string> sources, string target)
+    {
+        if (move) Preview.Stop(); // taşınan medya dosyası kilitli kalmasın
+        if (_settings.UseTransferQueue)
+        {
+            TransferManager.Current.Enqueue(move ? TransferKind.Move : TransferKind.Copy, sources, target, _settings.DefaultConflictPolicy);
+            return true;
+        }
+        return move
+            ? await ShellFileOperations.MoveAsync(Hwnd, sources, target)
+            : await ShellFileOperations.CopyAsync(Hwnd, sources, target);
+    }
+
+    private void OpenNewWindow()
+    {
+        var window = new MainWindow(false,
+            _active.IsFileSystemFolder ? _active.CurrentPath : null,
+            Other.IsFileSystemFolder ? Other.CurrentPath : null);
+        window.Activate();
+    }
+
+    /// <summary>Seçili öğeleri başka bir penceredeki aktif panele kopyalar (monitörler arası).</summary>
+    private async Task SendToOtherWindowAsync()
+    {
+        var selection = _active.SelectedItems;
+        if (selection.Count == 0 || _active.IsInArchive) return;
+        var others = All.Where(w => w != this && w.AppWindow.IsVisible).ToList();
+        if (others.Count == 0)
+        {
+            if (await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, "Başka pencere yok",
+                    "Diğer monitörde kullanmak için yeni bir pencere açılsın mı? (Ctrl+N)", "Yeni pencere"))
+                OpenNewWindow();
+            return;
+        }
+        var target = others[0]._active;
+        if (!target.IsFileSystemFolder)
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Hedef seçilmedi", "Diğer pencerenin aktif panelinde bir klasör açın.");
+            return;
+        }
+        await QueueOrShellAsync(false, selection.Select(i => i.FullPath).ToList(), target.CurrentPath);
+        _active.ShowStatus($"{selection.Count} öğe diğer pencereye gönderildi → {target.CurrentPath}");
+    }
+
     // ================================================================ Yerleşim
 
     private void ResizePanes(double dx)
@@ -1372,6 +1551,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void SaveSession()
     {
+        if (!_isPrimary) return;
         _settings.SetString("Pane.History", string.Join('\n', _history));
         _placement.Save();
         LeftPane.Save();
@@ -1448,8 +1628,13 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void HideToTray()
     {
+        if (!_isPrimary)
+        {
+            Close();
+            return;
+        }
         SaveSession();
-        _tray.Show();
+        _tray?.Show();
         Preview.Stop();
         AppWindow.Hide();
         if (!_trayHintShown)
@@ -1461,6 +1646,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void AppWindow_CloseRequestedByUser()
     {
+        if (!_isPrimary) { Close(); return; }
         if (_settings.RunInBackground) HideToTray();
         else ExitApplication();
     }
@@ -1468,6 +1654,11 @@ public sealed partial class MainWindow : Window, IPaneHost
     private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
     {
         if (_exiting) return;
+        if (!_isPrimary)
+        {
+            Preview.Stop();
+            return; // ek pencere gerçekten kapanır
+        }
         if (_settings.RunInBackground)
         {
             args.Cancel = true;
@@ -1480,7 +1671,7 @@ public sealed partial class MainWindow : Window, IPaneHost
     private void AppWindow_Changed(AppWindow sender, AppWindowChangedEventArgs args)
     {
         if (!args.DidPresenterChange && !args.DidSizeChange) return;
-        if (_settings.MinimizeToTray && sender.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized })
+        if (_isPrimary && _settings.MinimizeToTray && sender.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized })
         {
             HideToTray();
         }
@@ -1488,8 +1679,18 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void ExitApplication()
     {
+        if (!_isPrimary)
+        {
+            Primary?.ExitApplication();
+            return;
+        }
         if (_exiting) return;
         _exiting = true;
+
+        foreach (var job in TransferManager.Current.Jobs.Where(j => !j.IsFinished).ToList())
+            TransferManager.Current.Cancel(job);
+        foreach (var window in All.Where(w => w != this).ToList()) window.Close();
+        _transfersWindow?.Close();
 
         foreach (var item in DownloadManager.Current.Items.Where(i => i.State == DownloadState.Downloading).ToList())
             DownloadManager.Current.Pause(item);
@@ -1497,7 +1698,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         SaveSession();
         Clipboard.ContentChanged -= Clipboard_ContentChanged;
         _taskbar.Set(null);
-        _tray.Dispose();
+        _tray?.Dispose();
         Preview.Stop();
         _downloadsWindow?.Close();
         Application.Current.Exit();

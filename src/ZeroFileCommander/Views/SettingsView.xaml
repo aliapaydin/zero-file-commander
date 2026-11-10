@@ -23,6 +23,24 @@
                 </StackPanel>
             </StackPanel>
 
+            <!-- Aktarımlar -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="Kopyalama ve taşıma" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <ToggleSwitch x:Name="QueueToggle" Header="Aktarım kuyruğunu kullan (duraklat/sürdür, çakışmaları sona bırak)" Toggled="QueueToggle_Toggled" />
+                <ComboBox x:Name="ConflictChoice" Header="Hedefte aynı ad varsa" MinWidth="280" SelectionChanged="ConflictChoice_SelectionChanged">
+                    <ComboBoxItem Content="Sona bırak ve sor" />
+                    <ComboBoxItem Content="Daha yeniyse değiştir" />
+                    <ComboBoxItem Content="Atla" />
+                    <ComboBoxItem Content="Her zaman değiştir" />
+                    <ComboBoxItem Content="İkisini de tut (yeniden adlandır)" />
+                </ComboBox>
+                <TextBlock
+                    TextWrapping="Wrap"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="Kapalıyken Windows'un kendi kopyalama penceresi kullanılır. Arşiv içi işlemler her zaman doğrudan yapılır." />
+            </StackPanel>
+
             <!-- Arka plan -->
             <StackPanel Spacing="10">
                 <TextBlock Text="Arka planda çalışma" Style="{StaticResource SubtitleTextBlockStyle}" />

@@ -40,8 +40,8 @@ public sealed class PaneTab
 /// </summary>
 public sealed partial class FilePane : UserControl
 {
-    private const string InternalPathsKey = "ZFC.Paths";
-    private const string InternalSourceKey = "ZFC.Source";
+    public const string InternalPathsKey = "ZFC.Paths";
+    public const string InternalSourceKey = "ZFC.Source";
     private const string DriveListToken = "::drives";
 
     private static readonly EnumerationOptions Enumeration = new()
@@ -962,6 +962,8 @@ public sealed partial class FilePane : UserControl
             if (!item.IsInArchive && IsFileSystemFolder)
             {
                 menu.SecondaryCommands.Add(MenuButton("ZIP olarak sıkıştır…", "\uF012", PaneCommand.Compress));
+                menu.SecondaryCommands.Add(MenuButton("Rafa ekle", "\uE7B8", PaneCommand.AddToShelf));
+                menu.SecondaryCommands.Add(MenuButton("Diğer pencereye kopyala", "\uE8A7", PaneCommand.SendToWindow, "Ctrl+Shift+→"));
             }
 
             menu.SecondaryCommands.Add(new AppBarSeparator());

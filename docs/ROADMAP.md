@@ -52,10 +52,11 @@ Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor
 - [x] Arama (Alt+F7 / Ctrl+Shift+F): ad deseni ve içerik, sonuçlar akarak gelir, "Panelde göster"
 - [x] Komut paleti (Ctrl+K): komutlar, son klasörler, sürücüler, bu klasördeki dosyalar; ">" ve "/" süzgeçleri
 
-## Faz 3 · v0.6: Transfer motoru ve çoklu pencere
-- [ ] Kendi kopyalama kuyruğu: duraklat/devam, hız, kalan süre
-- [ ] Bloklamayan çakışma çözümü ("yalnızca daha yeniyse değiştir" gibi kurallar)
-- [ ] Yeni pencere; pencereler/monitörler arası sürükle-bırak
+## Faz 3 · v0.6: Transfer motoru ve çoklu pencere ✅
+- [x] Kendi kopyalama kuyruğu: duraklat/devam, hız, kalan süre (Pencere → Aktarımlar)
+- [x] Bloklamayan çakışma çözümü ("yalnızca daha yeniyse değiştir" gibi kurallar)
+- [x] Yeni pencere (Ctrl+N); pencereler/monitörler arası sürükle-bırak ve Ctrl+Shift+→ ile gönderme
+- [x] Raf: dosyaları toplayıp sonra bırakmak için her zaman üstte duran pencere (Ctrl+Shift+S)
 
 ## Faz 4 · v0.7: Veri ve geliştirici önizlemeleri
 - [ ] CSV / Parquet tablo önizlemesi

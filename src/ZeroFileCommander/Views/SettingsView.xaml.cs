@@ -31,6 +31,9 @@ public sealed partial class SettingsView : UserControl
         HoverToggle.IsOn = _settings.HoverPreview;
         HoverDelay.Value = _settings.HoverDelayMs;
         HoverDelayText.Text = $"{_settings.HoverDelayMs} ms";
+        QueueToggle.IsOn = _settings.UseTransferQueue;
+        ConflictChoice.SelectedIndex = (int)_settings.DefaultConflictPolicy;
+        ConflictChoice.IsEnabled = _settings.UseTransferQueue;
         BackgroundToggle.IsOn = _settings.RunInBackground;
         MinimizeToggle.IsOn = _settings.MinimizeToTray;
         DownloadsToggle.IsOn = _settings.DownloadsEnabled;
@@ -71,6 +74,18 @@ public sealed partial class SettingsView : UserControl
         if (HoverDelayText is null) return;
         HoverDelayText.Text = $"{(int)e.NewValue} ms";
         if (!_loading) _settings.HoverDelayMs = (int)e.NewValue;
+    }
+
+    private void QueueToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        ConflictChoice.IsEnabled = QueueToggle.IsOn;
+        if (!_loading) _settings.UseTransferQueue = QueueToggle.IsOn;
+    }
+
+    private void ConflictChoice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || ConflictChoice.SelectedIndex < 0) return;
+        _settings.DefaultConflictPolicy = (ConflictPolicy)ConflictChoice.SelectedIndex;
     }
 
     private void BackgroundToggle_Toggled(object sender, RoutedEventArgs e)

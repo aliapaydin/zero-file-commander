@@ -24,6 +24,8 @@ public enum PaneCommand
     Compress,
     ExtractHere,
     ExtractToOther,
+    AddToShelf,
+    SendToWindow,
 }
 
 /// <summary>Panelin komutları ve bırakılan dosyaları ilettiği ana pencere.</summary>

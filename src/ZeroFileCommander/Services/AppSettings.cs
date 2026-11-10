@@ -46,6 +46,11 @@ public sealed class AppSettings
     /// <summary>Simge durumuna küçültünce görev çubuğundan da gizlenip tepsiye iner.</summary>
     public bool MinimizeToTray { get => Get(false); set => Set(value); }
 
+    // ---- Kopyalama / taşıma ----
+    /// <summary>F5/F6, yapıştır ve sürükle-bırakta Zero'nun kuyruklu kopyalama motorunu kullan.</summary>
+    public bool UseTransferQueue { get => Get(true); set => Set(value); }
+    public ConflictPolicy DefaultConflictPolicy { get => (ConflictPolicy)Get(0); set => Set((int)value); }
+
     // ---- İndirmeler ----
     public bool DownloadsEnabled { get => Get(false); set => Set(value); }
     public string DownloadFolder

@@ -189,6 +189,16 @@
                 <MenuFlyoutItem x:Name="MenuDownloads" Text="İndirmeler" Tag="app:downloads" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+J">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE896;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Aktarımlar" Tag="app:transfers" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Raf" Tag="app:shelf" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+S">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE7B8;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Yeni pencere" Tag="app:newwindow" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+N">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE78B;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Diğer pencereye kopyala" Tag="app:sendtowindow" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+→" />
                 <MenuFlyoutItem Text="Tepsiye gizle" Tag="app:hide" Click="Command_Click">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE921;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
@@ -370,9 +380,21 @@
                 <Button Tag="Delete" Click="Command_Click" ToolTipService.ToolTip="Geri Dönüşüm Kutusu'na gönder · Shift ile kalıcı sil">F8 Sil</Button>
             </StackPanel>
 
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+            <Button
+                x:Name="TransferIndicator"
+                Visibility="Collapsed"
+                Tag="app:transfers"
+                Click="Command_Click"
+                ToolTipService.ToolTip="Aktarımları göster">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <FontIcon Glyph="&#xE8C8;" FontSize="14" />
+                    <TextBlock x:Name="TransferIndicatorText" VerticalAlignment="Center" />
+                    <ProgressBar x:Name="TransferIndicatorBar" Width="90" Maximum="100" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
             <Button
                 x:Name="DownloadIndicator"
-                Grid.Column="1"
                 Visibility="Collapsed"
                 Tag="app:downloads"
                 Click="Command_Click"
@@ -383,6 +405,7 @@
                     <ProgressBar x:Name="DownloadIndicatorBar" Width="90" Maximum="100" VerticalAlignment="Center" />
                 </StackPanel>
             </Button>
+            </StackPanel>
 
             <TextBlock
                 x:Name="HintText"
