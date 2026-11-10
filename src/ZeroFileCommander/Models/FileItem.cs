@@ -1,9 +1,15 @@
+using System.ComponentModel;
+using Microsoft.UI.Xaml.Media;
+
 namespace ZeroFileCommander.Models;
 
 /// <summary>Bir paneldeki tek satır: sürücü, klasör, dosya ya da "..".</summary>
-public sealed class FileItem
+public sealed class FileItem : INotifyPropertyChanged
 {
     private FileKind? _kind;
+    private ImageSource? _icon;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     public string Name { get; set; } = string.Empty;
     public string FullPath { get; set; } = string.Empty;
@@ -21,6 +27,9 @@ public sealed class FileItem
     public string Extension =>
         IsDirectory ? string.Empty : Path.GetExtension(Name).TrimStart('.').ToUpperInvariant();
 
+    /// <summary>Uzantı sütununda gösterilen metin.</summary>
+    public string ExtensionText => IsDirectory ? string.Empty : Extension.ToLowerInvariant();
+
     public string SizeText =>
         IsParent ? string.Empty :
         IsDrive ? string.Empty :
@@ -29,11 +38,31 @@ public sealed class FileItem
 
     public string ModifiedText => Modified?.ToString("dd.MM.yyyy HH:mm") ?? string.Empty;
 
-    // Segoe Fluent Icons
+    // Segoe Fluent Icons (gerçek simge yüklenene kadar ya da ".." için)
     public string Glyph =>
         IsParent ? "" :
         IsDrive ? "" :
         FileKinds.Glyph(Kind);
+
+    /// <summary>Windows'un bu dosya türü için kullandığı simge (gecikmeli yüklenir).</summary>
+    public ImageSource? Icon
+    {
+        get => _icon;
+        set
+        {
+            if (ReferenceEquals(_icon, value)) return;
+            _icon = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Icon)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GlyphOpacity)));
+        }
+    }
+
+    /// <summary>Gerçek simge varsa yazı tipi simgesi gizlenir.</summary>
+    public double GlyphOpacity => _icon is null ? 1 : 0;
+
+    /// <summary>Aynı dosyanın içeriği değişmemiş mi (yenilemede nesneyi korumak için).</summary>
+    public bool SameAs(FileItem other) =>
+        IsDirectory == other.IsDirectory && Size == other.Size && Modified == other.Modified && Name == other.Name;
 
     public static string FormatSize(long bytes)
     {

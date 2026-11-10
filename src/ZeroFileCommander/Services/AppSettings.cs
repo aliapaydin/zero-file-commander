@@ -68,6 +68,12 @@ public sealed class AppSettings
     // ---- Bildirimler ----
     public NotificationPosition NotificationPosition { get => (NotificationPosition)Get(0); set => Set((int)value); }
 
+    // ---- Panel başına değerler (sekmeler, sıralama) ----
+    public string GetString(string key, string fallback = "") => Get(fallback, key);
+    public void SetString(string key, string value) => Set(value, key);
+    public int GetInt(string key, int fallback = 0) => Get(fallback, key);
+    public void SetInt(string key, int value) => Set(value, key);
+
     private static readonly string[] LayoutKeys =
     [
         nameof(MainWindowBounds), nameof(DownloadsWindowBounds), nameof(TreeWidth),

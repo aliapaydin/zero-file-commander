@@ -34,4 +34,7 @@ public interface IPaneHost
 
     /// <summary>Panelin klasöründe yeni klasör (<paramref name="entry"/> null) ya da dosya oluşturur.</summary>
     Task CreateNewAsync(FilePane pane, Services.ShellNewEntry? entry);
+
+    /// <summary>Verilen klasörü karşı panelde yeni sekmede açar.</summary>
+    void OpenInOtherPane(FilePane source, string path);
 }

@@ -96,8 +96,10 @@ public sealed partial class MainWindow : Window, IPaneHost
         _settings.Changed += Settings_Changed;
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        LeftPane.Navigate(Directory.Exists(_settings.LeftPath) ? _settings.LeftPath : home);
-        RightPane.Navigate(Directory.Exists(_settings.RightPath) ? _settings.RightPath : string.Empty);
+        LeftPane.SettingsKey = "Left";
+        RightPane.SettingsKey = "Right";
+        LeftPane.Restore(Directory.Exists(_settings.LeftPath) ? _settings.LeftPath : home);
+        RightPane.Restore(Directory.Exists(_settings.RightPath) ? _settings.RightPath : string.Empty);
         SetActive(LeftPane);
         LeftPane.FocusList();
 
@@ -157,6 +159,15 @@ public sealed partial class MainWindow : Window, IPaneHost
     {
         bool inText = FocusManager.GetFocusedElement(Content.XamlRoot) is TextBox;
 
+        // Ctrl+Tab / Ctrl+Shift+Tab: aktif paneldeki sekmeler arasında geç.
+        if (e.Key == VirtualKey.Tab && IsDown(VirtualKey.Control))
+        {
+            _active.NextTab(IsDown(VirtualKey.Shift) ? -1 : 1);
+            _active.FocusList();
+            e.Handled = true;
+            return;
+        }
+
         // Tab ile paneller arasında geç.
         if (e.Key == VirtualKey.Tab && !inText)
         {
@@ -205,6 +216,9 @@ public sealed partial class MainWindow : Window, IPaneHost
             VirtualKey.Q when ctrl => "app:preview",
             VirtualKey.E when ctrl && shift => "app:tree",
             VirtualKey.J when ctrl => "app:downloads",
+            VirtualKey.T when ctrl => "app:newtab",
+            VirtualKey.W when ctrl => "app:closetab",
+            VirtualKey.L when ctrl => "app:editpath",
             _ => null,
         };
         if (tag is null) return;
@@ -351,6 +365,12 @@ public sealed partial class MainWindow : Window, IPaneHost
             case "app:focusleft": SetActive(LeftPane); LeftPane.FocusList(); break;
             case "app:focusright": SetActive(RightPane); RightPane.FocusList(); break;
             case "app:resetlayout": ResetLayout(); break;
+            case "app:newtab": _active.AddTab(); _active.FocusList(); break;
+            case "app:closetab": _active.CloseCurrentTab(); _active.FocusList(); break;
+            case "app:nexttab": _active.NextTab(1); _active.FocusList(); break;
+            case "app:editpath": _active.BeginEditPath(); break;
+            case "app:selectpattern": await _active.SelectByPatternAsync(select: true); break;
+            case "app:deselectpattern": await _active.SelectByPatternAsync(select: false); break;
             case "app:log":
                 Directory.CreateDirectory(CrashLog.FolderPath);
                 if (!File.Exists(CrashLog.FilePath)) File.WriteAllText(CrashLog.FilePath, "Henüz kayıtlı hata yok.\r\n");
@@ -624,6 +644,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void Settings_Changed(object? sender, string name)
     {
+        if (name.StartsWith("Pane.", StringComparison.Ordinal)) return; // panelin kendi kayıtları
         DispatcherQueue.TryEnqueue(() =>
         {
             if (name is "Layout" or "All")
@@ -949,8 +970,16 @@ public sealed partial class MainWindow : Window, IPaneHost
     private void SaveSession()
     {
         _placement.Save();
-        _settings.LeftPath = LeftPane.CurrentPath;
-        _settings.RightPath = RightPane.CurrentPath;
+        LeftPane.Save();
+        RightPane.Save();
+    }
+
+    public void OpenInOtherPane(FilePane source, string path)
+    {
+        var target = source == LeftPane ? RightPane : LeftPane;
+        target.AddTab(path);
+        SetActive(target);
+        target.FocusList();
     }
 
     public async Task CreateNewAsync(FilePane pane, ShellNewEntry? entry)

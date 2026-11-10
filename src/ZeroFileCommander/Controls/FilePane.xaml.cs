@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -9,28 +11,57 @@ using Windows.ApplicationModel.DataTransfer;
 using Windows.ApplicationModel.DataTransfer.DragDrop;
 using Windows.Foundation;
 using Windows.System;
+using Windows.UI.Core;
+using DispatcherQueuePriority = Microsoft.UI.Dispatching.DispatcherQueuePriority;
 using DispatcherQueueTimer = Microsoft.UI.Dispatching.DispatcherQueueTimer;
 using ZeroFileCommander.Models;
 using ZeroFileCommander.Services;
+using ZeroFileCommander.Views;
 
 namespace ZeroFileCommander.Controls;
 
-/// <summary>Tek bir dosya paneli. İki tanesi yan yana ana pencereyi oluşturur.</summary>
+public enum SortKey
+{
+    Name,
+    Extension,
+    Size,
+    Date,
+}
+
+/// <summary>Bir paneldeki sekme: hangi klasörü gösterdiği.</summary>
+public sealed class PaneTab
+{
+    public string Path { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Tek bir dosya paneli: sekmeler, yol çubuğu, sıralanabilir liste, yazarak filtreleme,
+/// canlı yenileme. İki tanesi yan yana ana pencereyi oluşturur.
+/// </summary>
 public sealed partial class FilePane : UserControl
 {
     private const string InternalPathsKey = "ZFC.Paths";
     private const string InternalSourceKey = "ZFC.Source";
+    private const string DriveListToken = "::drives";
 
     private static readonly EnumerationOptions Enumeration = new()
     {
         IgnoreInaccessible = true,
-        AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
+        AttributesToSkip = System.IO.FileAttributes.Hidden | System.IO.FileAttributes.System,
     };
 
     private readonly string _paneId = Guid.NewGuid().ToString("N");
     private readonly DispatcherQueueTimer _hoverTimer;
+    private readonly DispatcherQueueTimer _refreshTimer;
+    private readonly List<string> _crumbPaths = new();
+    private List<FileItem> _all = new();
     private FileItem? _hoverItem;
     private Point _hoverPoint;
+    private FileSystemWatcher? _watcher;
+    private string _filter = string.Empty;
+    private SortKey _sortKey = SortKey.Name;
+    private bool _sortDescending;
+    private bool _suppressTabEvents;
 
     public ObservableCollection<FileItem> Items { get; } = new();
 
@@ -40,6 +71,9 @@ public sealed partial class FilePane : UserControl
     public bool IsDriveList => CurrentPath.Length == 0;
 
     public IPaneHost? Host { get; set; }
+
+    /// <summary>Ayarlarda sekmelerin saklandığı anahtar ön eki ("Left" / "Right").</summary>
+    public string SettingsKey { get; set; } = "Left";
 
     /// <summary>Panel odak aldığında tetiklenir; ana pencere aktif paneli buna göre belirler.</summary>
     public event EventHandler? Activated;
@@ -53,16 +87,39 @@ public sealed partial class FilePane : UserControl
         _hoverTimer = DispatcherQueue.CreateTimer();
         _hoverTimer.IsRepeating = false;
         _hoverTimer.Tick += HoverTimer_Tick;
+
+        _refreshTimer = DispatcherQueue.CreateTimer();
+        _refreshTimer.IsRepeating = false;
+        _refreshTimer.Interval = TimeSpan.FromMilliseconds(350);
+        _refreshTimer.Tick += (_, _) => Refresh();
+
+        Unloaded += (_, _) => StopWatching();
+        UpdateSortIndicators();
     }
 
     /// <summary>Seçili gerçek öğeler ("..", sürücüler hariç).</summary>
     public IReadOnlyList<FileItem> SelectedItems =>
         FileList.SelectedItems.Cast<FileItem>().Where(i => i.IsEntry).ToList();
 
-    /// <summary>İmlecin bulunduğu öğe.</summary>
-    public FileItem? FocusedItem => FileList.SelectedItem as FileItem;
+    /// <summary>Klavye odağının (imlecin) bulunduğu öğe; yoksa ilk seçili öğe.</summary>
+    public FileItem? FocusedItem
+    {
+        get
+        {
+            int index = FocusedIndex();
+            if (index >= 0 && index < Items.Count) return Items[index];
+            return FileList.SelectedItem as FileItem;
+        }
+    }
 
-    public void FocusList() => FileList.Focus(FocusState.Programmatic);
+    public void FocusList()
+    {
+        int index = FocusedIndex();
+        if (index >= 0 && FileList.ContainerFromIndex(index) is ListViewItem container)
+            container.Focus(FocusState.Programmatic);
+        else
+            FileList.Focus(FocusState.Programmatic);
+    }
 
     public void SetActive(bool active)
     {
@@ -73,77 +130,200 @@ public sealed partial class FilePane : UserControl
 
     public void ShowStatus(string text) => StatusText.Text = text;
 
-    // ---------------------------------------------------------------- Gezinme
+    // ================================================================ Sekmeler
+
+    private PaneTab? CurrentTab => (Tabs.SelectedItem as TabViewItem)?.Tag as PaneTab;
+
+    /// <summary>Kayıtlı sekmeleri ve sıralamayı geri yükler; yoksa <paramref name="fallback"/> açılır.</summary>
+    public void Restore(string fallback)
+    {
+        var settings = AppSettings.Current;
+        if (Enum.TryParse<SortKey>(settings.GetString($"Pane.{SettingsKey}.Sort", nameof(SortKey.Name)), out var key)) _sortKey = key;
+        _sortDescending = settings.GetInt($"Pane.{SettingsKey}.SortDesc") == 1;
+        UpdateSortIndicators();
+
+        var saved = settings.GetString($"Pane.{SettingsKey}.Tabs")
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Where(p => p == DriveListToken || Directory.Exists(p))
+            .ToList();
+        if (saved.Count == 0) saved.Add(string.IsNullOrEmpty(fallback) ? DriveListToken : fallback);
+
+        _suppressTabEvents = true;
+        Tabs.TabItems.Clear();
+        foreach (var path in saved) Tabs.TabItems.Add(CreateTabItem(path == DriveListToken ? string.Empty : path));
+        int index = Math.Clamp(settings.GetInt($"Pane.{SettingsKey}.TabIndex"), 0, Tabs.TabItems.Count - 1);
+        Tabs.SelectedIndex = index;
+        _suppressTabEvents = false;
+
+        UpdateClosable();
+        Navigate(CurrentTab?.Path ?? string.Empty);
+    }
+
+    /// <summary>Sekmeleri ve sıralamayı ayarlara yazar.</summary>
+    public void Save()
+    {
+        var settings = AppSettings.Current;
+        var paths = Tabs.TabItems.OfType<TabViewItem>()
+            .Select(t => t.Tag is PaneTab tab ? (tab.Path.Length == 0 ? DriveListToken : tab.Path) : null)
+            .Where(p => p is not null);
+        settings.SetString($"Pane.{SettingsKey}.Tabs", string.Join('\n', paths));
+        settings.SetInt($"Pane.{SettingsKey}.TabIndex", Math.Max(0, Tabs.SelectedIndex));
+        settings.SetString($"Pane.{SettingsKey}.Sort", _sortKey.ToString());
+        settings.SetInt($"Pane.{SettingsKey}.SortDesc", _sortDescending ? 1 : 0);
+    }
+
+    /// <summary>Yeni sekme açar (varsayılan: bu sekmenin klasörü).</summary>
+    public void AddTab(string? path = null)
+    {
+        var item = CreateTabItem(path ?? CurrentPath);
+        Tabs.TabItems.Add(item);
+        Tabs.SelectedItem = item; // SelectionChanged gezinir
+        UpdateClosable();
+    }
+
+    public void CloseCurrentTab()
+    {
+        if (Tabs.SelectedItem is TabViewItem item) CloseTab(item);
+    }
+
+    public void NextTab(int delta)
+    {
+        int count = Tabs.TabItems.Count;
+        if (count < 2) return;
+        Tabs.SelectedIndex = ((Tabs.SelectedIndex + delta) % count + count) % count;
+    }
+
+    private TabViewItem CreateTabItem(string path)
+    {
+        var tab = new PaneTab { Path = path };
+        var item = new TabViewItem
+        {
+            Tag = tab,
+            IconSource = new FontIconSource { Glyph = path.Length == 0 ? "\uEDA2" : "\uE8B7" },
+        };
+        UpdateTabHeader(item);
+
+        var menu = new MenuFlyout();
+        var other = new MenuFlyoutItem { Text = "Karşı panelde aç", Icon = new FontIcon { Glyph = "\uE8AB" } };
+        other.Click += (_, _) => Host?.OpenInOtherPane(this, tab.Path);
+        var duplicate = new MenuFlyoutItem { Text = "Sekmeyi çoğalt", Icon = new FontIcon { Glyph = "\uE8C8" } };
+        duplicate.Click += (_, _) => AddTab(tab.Path);
+        var closeOthers = new MenuFlyoutItem { Text = "Diğer sekmeleri kapat" };
+        closeOthers.Click += (_, _) => CloseOtherTabs(item);
+        var close = new MenuFlyoutItem { Text = "Sekmeyi kapat", KeyboardAcceleratorTextOverride = "Ctrl+W" };
+        close.Click += (_, _) => CloseTab(item);
+        menu.Items.Add(other);
+        menu.Items.Add(duplicate);
+        menu.Items.Add(new MenuFlyoutSeparator());
+        menu.Items.Add(closeOthers);
+        menu.Items.Add(close);
+        item.ContextFlyout = menu;
+        return item;
+    }
+
+    private static void UpdateTabHeader(TabViewItem item)
+    {
+        if (item.Tag is not PaneTab tab) return;
+        string name;
+        if (tab.Path.Length == 0) name = "Bu bilgisayar";
+        else
+        {
+            name = Path.GetFileName(tab.Path.TrimEnd('\\'));
+            if (name.Length == 0) name = tab.Path; // sürücü kökü: "C:\"
+        }
+        item.Header = name;
+        ToolTipService.SetToolTip(item, tab.Path.Length == 0 ? "Bu bilgisayar" : tab.Path);
+        if (item.IconSource is FontIconSource icon) icon.Glyph = tab.Path.Length == 0 ? "\uEDA2" : "\uE8B7";
+    }
+
+    private void CloseTab(TabViewItem item)
+    {
+        if (Tabs.TabItems.Count <= 1) return;
+        int index = Tabs.TabItems.IndexOf(item);
+        bool wasSelected = ReferenceEquals(Tabs.SelectedItem, item);
+        Tabs.TabItems.Remove(item);
+        if (wasSelected) Tabs.SelectedIndex = Math.Clamp(index, 0, Tabs.TabItems.Count - 1);
+        UpdateClosable();
+    }
+
+    private void CloseOtherTabs(TabViewItem keep)
+    {
+        foreach (var other in Tabs.TabItems.OfType<TabViewItem>().Where(t => !ReferenceEquals(t, keep)).ToList())
+            Tabs.TabItems.Remove(other);
+        Tabs.SelectedItem = keep;
+        UpdateClosable();
+    }
+
+    private void UpdateClosable()
+    {
+        bool closable = Tabs.TabItems.Count > 1;
+        foreach (var item in Tabs.TabItems.OfType<TabViewItem>()) item.IsClosable = closable;
+    }
+
+    private void Tabs_AddTabButtonClick(TabView sender, object args) => AddTab();
+
+    private void Tabs_TabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args) => CloseTab(args.Tab);
+
+    private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressTabEvents || CurrentTab is not { } tab) return;
+        if (!string.Equals(tab.Path, CurrentPath, StringComparison.OrdinalIgnoreCase)) Navigate(tab.Path);
+        Activated?.Invoke(this, EventArgs.Empty);
+    }
+
+    // ================================================================ Gezinme ve liste
 
     public void Navigate(string? path)
     {
+        path ??= string.Empty;
         var previous = CurrentPath;
-        var newItems = new List<FileItem>();
+        bool sameFolder = string.Equals(previous, path, StringComparison.OrdinalIgnoreCase) && Items.Count > 0;
 
-        if (string.IsNullOrEmpty(path))
+        List<FileItem> loaded;
+        try
         {
-            foreach (var drive in DriveInfo.GetDrives())
-            {
-                string label;
-                try
-                {
-                    label = drive.IsReady && !string.IsNullOrWhiteSpace(drive.VolumeLabel)
-                        ? $"{drive.Name.TrimEnd('\\')}  {drive.VolumeLabel}"
-                        : drive.Name.TrimEnd('\\');
-                }
-                catch
-                {
-                    label = drive.Name.TrimEnd('\\');
-                }
-                newItems.Add(new FileItem { Name = label, FullPath = drive.RootDirectory.FullName, IsDirectory = true, IsDrive = true });
-            }
-            CurrentPath = string.Empty;
-            PathBox.Text = "Bu bilgisayar";
+            loaded = path.Length == 0 ? LoadDrives() : LoadFolder(path, out path);
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = ex.Message;
+            return;
+        }
+
+        if (!sameFolder)
+        {
+            _filter = string.Empty;
+            UpdateFilterBar();
         }
         else
         {
-            try
+            // Değişmeyen öğeleri koru: seçim ve kaydırma konumu bozulmaz.
+            var old = new Dictionary<string, FileItem>(StringComparer.OrdinalIgnoreCase);
+            foreach (var existingItem in _all) old.TryAdd(existingItem.FullPath, existingItem);
+            for (int i = 0; i < loaded.Count; i++)
             {
-                var dir = new DirectoryInfo(path);
-                newItems.Add(new FileItem { Name = "..", FullPath = dir.Parent?.FullName ?? string.Empty, IsDirectory = true, IsParent = true });
-
-                foreach (var d in dir.EnumerateDirectories("*", Enumeration).OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase))
-                {
-                    newItems.Add(new FileItem { Name = d.Name, FullPath = d.FullName, IsDirectory = true, Modified = d.LastWriteTime });
-                }
-                foreach (var f in dir.EnumerateFiles("*", Enumeration).OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase))
-                {
-                    newItems.Add(new FileItem { Name = f.Name, FullPath = f.FullName, Size = f.Length, Modified = f.LastWriteTime });
-                }
-                CurrentPath = dir.FullName;
-                PathBox.Text = CurrentPath;
-            }
-            catch (Exception ex)
-            {
-                StatusText.Text = ex.Message;
-                PathBox.Text = previous.Length == 0 ? "Bu bilgisayar" : previous;
-                return;
+                if (old.TryGetValue(loaded[i].FullPath, out var existing) && existing.SameAs(loaded[i])) loaded[i] = existing;
             }
         }
 
-        // Yenilemede seçimi korumak için önceki seçili yolları hatırla.
-        var keep = new HashSet<string>(FileList.SelectedItems.Cast<FileItem>().Select(i => i.FullPath), StringComparer.OrdinalIgnoreCase);
-        bool sameFolder = string.Equals(previous, CurrentPath, StringComparison.OrdinalIgnoreCase);
-
-        Items.Clear();
-        foreach (var item in newItems) Items.Add(item);
-
-        if (sameFolder && keep.Count > 0)
+        CurrentPath = path;
+        _all = loaded;
+        if (CurrentTab is { } tab)
         {
-            foreach (var item in Items.Where(i => keep.Contains(i.FullPath))) FileList.SelectedItems.Add(item);
+            tab.Path = path;
+            if (Tabs.SelectedItem is TabViewItem tabItem) UpdateTabHeader(tabItem);
         }
-        if (FileList.SelectedItems.Count == 0)
+        UpdateCrumbs();
+        ApplyView(resetItems: !sameFolder);
+
+        if (!sameFolder)
         {
             // Üst klasöre çıkınca geldiğimiz klasörü seçili getir (Total Commander davranışı).
             var reselect = Items.FirstOrDefault(i => !i.IsParent && string.Equals(i.FullPath.TrimEnd('\\'), previous.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
             FileList.SelectedItem = reselect ?? Items.FirstOrDefault();
+            if (FileList.SelectedItem is not null) FileList.ScrollIntoView(FileList.SelectedItem);
+            Watch(path);
         }
-        if (FileList.SelectedItem is not null) FileList.ScrollIntoView(FileList.SelectedItem);
 
         UpdateStatus();
         SelectionChangedEx?.Invoke(this, EventArgs.Empty);
@@ -176,6 +356,27 @@ public sealed partial class FilePane : UserControl
         }
     }
 
+    /// <summary>"*.pdf; rapor*" gibi desenlere uyan öğeleri seçer ya da seçimden çıkarır.</summary>
+    public async Task SelectByPatternAsync(bool select)
+    {
+        if (XamlRoot is null) return;
+        var input = await Dialogs.InputAsync(XamlRoot, ActualTheme, select ? "Desenle seç" : "Desenle seçimi kaldır",
+            AppSettings.Current.GetString("Pane.LastPattern", "*.*"), select ? "Seç" : "Kaldır");
+        if (input is null) return;
+        AppSettings.Current.SetString("Pane.LastPattern", input);
+
+        var regexes = input.Split([';', ' ', ','], StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => new Regex("^" + Regex.Escape(p).Replace(@"\*", ".*").Replace(@"\?", ".") + "$", RegexOptions.IgnoreCase))
+            .ToList();
+        foreach (var item in Items.Where(i => i.IsEntry && regexes.Any(r => r.IsMatch(i.Name))))
+        {
+            bool selected = FileList.SelectedItems.Contains(item);
+            if (select && !selected) FileList.SelectedItems.Add(item);
+            else if (!select && selected) FileList.SelectedItems.Remove(item);
+        }
+        FocusList();
+    }
+
     public void Open(FileItem item)
     {
         if (item.IsDirectory)
@@ -184,42 +385,311 @@ public sealed partial class FilePane : UserControl
             ShellActions.Open(item.FullPath);
     }
 
+    public void BeginEditPath()
+    {
+        PathBox.Text = IsDriveList ? string.Empty : CurrentPath;
+        CrumbHost.Visibility = Visibility.Collapsed;
+        PathBox.Visibility = Visibility.Visible;
+        PathBox.Focus(FocusState.Programmatic);
+        PathBox.SelectAll();
+    }
+
+    private static List<FileItem> LoadDrives()
+    {
+        var list = new List<FileItem>();
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            string label;
+            try
+            {
+                label = drive.IsReady && !string.IsNullOrWhiteSpace(drive.VolumeLabel)
+                    ? $"{drive.Name.TrimEnd('\\')}  {drive.VolumeLabel}"
+                    : drive.Name.TrimEnd('\\');
+            }
+            catch
+            {
+                label = drive.Name.TrimEnd('\\');
+            }
+            list.Add(new FileItem { Name = label, FullPath = drive.RootDirectory.FullName, IsDirectory = true, IsDrive = true });
+        }
+        return list;
+    }
+
+    private static List<FileItem> LoadFolder(string path, out string normalized)
+    {
+        var dir = new DirectoryInfo(path);
+        if (!dir.Exists) throw new DirectoryNotFoundException($"Klasör bulunamadı: {path}");
+        normalized = dir.FullName;
+
+        var list = new List<FileItem>
+        {
+            new() { Name = "..", FullPath = dir.Parent?.FullName ?? string.Empty, IsDirectory = true, IsParent = true },
+        };
+        foreach (var d in dir.EnumerateDirectories("*", Enumeration))
+            list.Add(new FileItem { Name = d.Name, FullPath = d.FullName, IsDirectory = true, Modified = d.LastWriteTime });
+        foreach (var f in dir.EnumerateFiles("*", Enumeration))
+            list.Add(new FileItem { Name = f.Name, FullPath = f.FullName, Size = f.Length, Modified = f.LastWriteTime });
+        return list;
+    }
+
+    /// <summary>Sıralama ve filtreyi uygular; listeyi en az değişiklikle günceller.</summary>
+    private void ApplyView(bool resetItems)
+    {
+        IEnumerable<FileItem> view = _all;
+        if (_filter.Length > 0)
+            view = view.Where(i => i.IsParent || i.Name.Contains(_filter, StringComparison.CurrentCultureIgnoreCase));
+        var target = Sort(view).ToList();
+
+        if (resetItems)
+        {
+            Items.Clear();
+            foreach (var item in target) Items.Add(item);
+            return;
+        }
+
+        var keepSelection = FileList.SelectedItems.Cast<FileItem>().ToList();
+        for (int i = 0; i < target.Count; i++)
+        {
+            var wanted = target[i];
+            if (i < Items.Count && ReferenceEquals(Items[i], wanted)) continue;
+            int existing = -1;
+            for (int j = i + 1; j < Items.Count; j++)
+            {
+                if (ReferenceEquals(Items[j], wanted)) { existing = j; break; }
+            }
+            if (existing >= 0) Items.Move(existing, i);
+            else Items.Insert(i, wanted);
+        }
+        while (Items.Count > target.Count) Items.RemoveAt(Items.Count - 1);
+
+        // Taşıma sırasında kaybolan seçimleri geri getir.
+        foreach (var item in keepSelection)
+        {
+            if (Items.Contains(item) && !FileList.SelectedItems.Contains(item)) FileList.SelectedItems.Add(item);
+        }
+    }
+
+    private IEnumerable<FileItem> Sort(IEnumerable<FileItem> items)
+    {
+        var list = items.ToList();
+        var parent = list.Where(i => i.IsParent);
+        var drives = list.Where(i => i.IsDrive).OrderBy(i => i.FullPath, StringComparer.OrdinalIgnoreCase);
+        var folders = list.Where(i => i.IsDirectory && i.IsEntry);
+        var files = list.Where(i => !i.IsDirectory);
+
+        var nameComparer = StringComparer.Create(System.Globalization.CultureInfo.CurrentCulture, ignoreCase: true);
+        IOrderedEnumerable<FileItem> OrderFiles(IEnumerable<FileItem> source) => _sortKey switch
+        {
+            SortKey.Extension => _sortDescending
+                ? source.OrderByDescending(i => i.Extension, nameComparer).ThenBy(i => i.Name, nameComparer)
+                : source.OrderBy(i => i.Extension, nameComparer).ThenBy(i => i.Name, nameComparer),
+            SortKey.Size => _sortDescending
+                ? source.OrderByDescending(i => i.Size ?? 0).ThenBy(i => i.Name, nameComparer)
+                : source.OrderBy(i => i.Size ?? 0).ThenBy(i => i.Name, nameComparer),
+            SortKey.Date => _sortDescending
+                ? source.OrderByDescending(i => i.Modified).ThenBy(i => i.Name, nameComparer)
+                : source.OrderBy(i => i.Modified).ThenBy(i => i.Name, nameComparer),
+            _ => _sortDescending
+                ? source.OrderByDescending(i => i.Name, nameComparer)
+                : source.OrderBy(i => i.Name, nameComparer),
+        };
+        // Klasörler her zaman üstte; boyutları olmadığı için boyuta göre sıralamada ada göre dizilir.
+        var orderedFolders = _sortKey == SortKey.Date
+            ? OrderFiles(folders)
+            : (_sortDescending && _sortKey == SortKey.Name
+                ? folders.OrderByDescending(i => i.Name, nameComparer)
+                : folders.OrderBy(i => i.Name, nameComparer));
+
+        return parent.Concat(drives).Concat(orderedFolders).Concat(OrderFiles(files));
+    }
+
+    private void SortHeader_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not string tag || !Enum.TryParse<SortKey>(tag, out var key)) return;
+        if (key == _sortKey) _sortDescending = !_sortDescending;
+        else
+        {
+            _sortKey = key;
+            _sortDescending = key is SortKey.Size or SortKey.Date; // büyükler/yeniler önce
+        }
+        UpdateSortIndicators();
+        ApplyView(resetItems: false);
+        if (FileList.SelectedItem is not null) FileList.ScrollIntoView(FileList.SelectedItem);
+        AppSettings.Current.SetString($"Pane.{SettingsKey}.Sort", _sortKey.ToString());
+        AppSettings.Current.SetInt($"Pane.{SettingsKey}.SortDesc", _sortDescending ? 1 : 0);
+    }
+
+    private void UpdateSortIndicators()
+    {
+        string arrow = _sortDescending ? "\uE70D" : "\uE70E";
+        SortName.Glyph = _sortKey == SortKey.Name ? arrow : string.Empty;
+        SortExtension.Glyph = _sortKey == SortKey.Extension ? arrow : string.Empty;
+        SortSize.Glyph = _sortKey == SortKey.Size ? arrow : string.Empty;
+        SortDate.Glyph = _sortKey == SortKey.Date ? arrow : string.Empty;
+    }
+
     private void UpdateStatus()
     {
         var selected = SelectedItems;
         if (selected.Count > 1)
         {
             long bytes = selected.Where(i => !i.IsDirectory).Sum(i => i.Size ?? 0);
-            StatusText.Text = $"{selected.Count} öğe seçili · {FileItem.FormatSize(bytes)}";
+            int folders = selected.Count(i => i.IsDirectory);
+            StatusText.Text = $"{selected.Count} öğe işaretli · {FileItem.FormatSize(bytes)}" + (folders > 0 ? $" ({folders} klasör hariç)" : string.Empty);
             return;
         }
-        int dirs = Items.Count(i => i.IsDirectory && !i.IsParent);
-        int files = Items.Count(i => !i.IsDirectory);
-        StatusText.Text = IsDriveList ? $"{dirs} sürücü" : $"{dirs} klasör, {files} dosya";
+        int dirs = _all.Count(i => i.IsDirectory && !i.IsParent);
+        int files = _all.Count(i => !i.IsDirectory);
+        string text = IsDriveList ? $"{dirs} sürücü" : $"{dirs} klasör, {files} dosya";
+        if (_filter.Length > 0) text += $" · filtre: {Items.Count(i => !i.IsParent)} eşleşme";
+        StatusText.Text = text;
     }
 
-    // ---------------------------------------------------------------- Olaylar
+    private int FocusedIndex()
+    {
+        if (XamlRoot is not null && FocusManager.GetFocusedElement(XamlRoot) is ListViewItem container)
+        {
+            int index = FileList.IndexFromContainer(container);
+            if (index >= 0) return index;
+        }
+        return FileList.SelectedIndex;
+    }
+
+    // ================================================================ Canlı yenileme
+
+    private void Watch(string path)
+    {
+        StopWatching();
+        if (path.Length == 0) return;
+        try
+        {
+            var root = Path.GetPathRoot(path);
+            if (root is not null && !root.StartsWith(@"\\", StringComparison.Ordinal))
+            {
+                var type = new DriveInfo(root).DriveType;
+                if (type is DriveType.Network or DriveType.CDRom) return; // ağ/CD'de izleme yavaş ve güvenilmez
+            }
+            else if (root is not null)
+            {
+                return; // UNC yolu
+            }
+
+            _watcher = new FileSystemWatcher(path)
+            {
+                IncludeSubdirectories = false,
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Size | NotifyFilters.LastWrite,
+            };
+            _watcher.Created += Watcher_Changed;
+            _watcher.Deleted += Watcher_Changed;
+            _watcher.Renamed += Watcher_Changed;
+            _watcher.Changed += Watcher_Changed;
+            _watcher.Error += (_, _) => DispatcherQueue.TryEnqueue(StopWatching);
+            _watcher.EnableRaisingEvents = true;
+        }
+        catch
+        {
+            StopWatching();
+        }
+    }
+
+    private void StopWatching()
+    {
+        if (_watcher is null) return;
+        _watcher.EnableRaisingEvents = false;
+        _watcher.Dispose();
+        _watcher = null;
+    }
+
+    private void Watcher_Changed(object sender, FileSystemEventArgs e)
+    {
+        // Olaylar art arda gelir; kısa bir süre bekleyip tek seferde yenile.
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            _refreshTimer.Stop();
+            _refreshTimer.Start();
+        });
+    }
+
+    // ================================================================ Yol çubuğu
+
+    private void UpdateCrumbs()
+    {
+        var names = new List<string> { "Bu bilgisayar" };
+        _crumbPaths.Clear();
+        _crumbPaths.Add(string.Empty);
+        if (!IsDriveList)
+        {
+            var parts = new Stack<DirectoryInfo>();
+            for (var d = new DirectoryInfo(CurrentPath); d is not null; d = d.Parent) parts.Push(d);
+            foreach (var d in parts)
+            {
+                names.Add(d.Parent is null ? d.FullName.TrimEnd('\\') : d.Name);
+                _crumbPaths.Add(d.FullName);
+            }
+        }
+        Crumbs.ItemsSource = names;
+        // Son parçayı görünür tut.
+        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => CrumbScroller.ChangeView(CrumbScroller.ScrollableWidth, null, null, true));
+    }
+
+    private void Crumbs_ItemClicked(BreadcrumbBar sender, BreadcrumbBarItemClickedEventArgs args)
+    {
+        if (args.Index >= 0 && args.Index < _crumbPaths.Count) Navigate(_crumbPaths[args.Index]);
+        FocusList();
+    }
+
+    private void CrumbHost_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        // Parçaların dışındaki boş alana tıklayınca düzenleme moduna geç.
+        if (ReferenceEquals(e.OriginalSource, CrumbHost) || e.OriginalSource is ScrollViewer or Border { Child: ScrollViewer })
+            BeginEditPath();
+    }
+
+    private void EditPath_Click(object sender, RoutedEventArgs e) => BeginEditPath();
+
+    private void EndEditPath()
+    {
+        PathBox.Visibility = Visibility.Collapsed;
+        CrumbHost.Visibility = Visibility.Visible;
+    }
+
+    private void PathBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Escape)
+        {
+            EndEditPath();
+            FocusList();
+            e.Handled = true;
+            return;
+        }
+        if (e.Key != VirtualKey.Enter) return;
+        var text = PathBox.Text.Trim().Trim('"');
+        EndEditPath();
+        Navigate(text.Length == 0 || text == "Bu bilgisayar" ? string.Empty : Environment.ExpandEnvironmentVariables(text));
+        FocusList();
+        e.Handled = true;
+    }
+
+    private void PathBox_LostFocus(object sender, RoutedEventArgs e) => EndEditPath();
+
+    // ================================================================ Klavye ve olaylar
 
     private void OnGotFocus(object sender, RoutedEventArgs e) => Activated?.Invoke(this, EventArgs.Empty);
 
     private void UpButton_Click(object sender, RoutedEventArgs e) => GoUp();
 
-    private void PathBox_KeyDown(object sender, KeyRoutedEventArgs e)
-    {
-        if (e.Key != VirtualKey.Enter) return;
-        var text = PathBox.Text.Trim();
-        Navigate(text == "Bu bilgisayar" ? string.Empty : Environment.ExpandEnvironmentVariables(text));
-        FocusList();
-        e.Handled = true;
-    }
-
     private void List_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        if (FocusedItem is { } item) Open(item);
+        if ((e.OriginalSource as FrameworkElement)?.DataContext is FileItem item) Open(item);
+        else if (FocusedItem is { } focused) Open(focused);
     }
+
+    private static bool IsDown(VirtualKey key) =>
+        InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(CoreVirtualKeyStates.Down);
 
     private void List_KeyDown(object sender, KeyRoutedEventArgs e)
     {
+        bool ctrl = IsDown(VirtualKey.Control);
         switch (e.Key)
         {
             case VirtualKey.Enter when FocusedItem is { } item:
@@ -227,20 +697,115 @@ public sealed partial class FilePane : UserControl
                 e.Handled = true;
                 break;
             case VirtualKey.Back:
-                GoUp();
+                if (_filter.Length > 0)
+                {
+                    _filter = _filter[..^1];
+                    UpdateFilter();
+                }
+                else
+                {
+                    GoUp();
+                }
                 e.Handled = true;
                 break;
-            case VirtualKey.Space when FocusedItem is { IsEntry: true }:
+            case VirtualKey.Escape when _filter.Length > 0:
+                _filter = string.Empty;
+                UpdateFilter();
+                e.Handled = true;
+                break;
+            case VirtualKey.Space when FocusedItem is { IsEntry: true } && _filter.Length == 0:
                 Host?.Execute(PaneCommand.Preview, this);
                 e.Handled = true;
                 break;
+            case VirtualKey.Insert:
+                ToggleMarkAndAdvance();
+                e.Handled = true;
+                break;
+            case VirtualKey.Add when !ctrl:
+                _ = SelectByPatternAsync(select: true);
+                e.Handled = true;
+                break;
+            case VirtualKey.Subtract when !ctrl:
+                _ = SelectByPatternAsync(select: false);
+                e.Handled = true;
+                break;
+            case VirtualKey.Multiply:
+                SelectAll(invert: true);
+                e.Handled = true;
+                break;
         }
+    }
+
+    /// <summary>Insert: imlecin üzerindeki öğeyi işaretle/kaldır ve bir aşağı in.</summary>
+    private void ToggleMarkAndAdvance()
+    {
+        int index = FocusedIndex();
+        if (index < 0 || index >= Items.Count) return;
+        var item = Items[index];
+        if (item.IsEntry)
+        {
+            if (FileList.SelectedItems.Contains(item)) FileList.SelectedItems.Remove(item);
+            else FileList.SelectedItems.Add(item);
+        }
+        int next = Math.Min(index + 1, Items.Count - 1);
+        FileList.ScrollIntoView(Items[next]);
+        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            if (FileList.ContainerFromIndex(next) is ListViewItem container) container.Focus(FocusState.Keyboard);
+        });
+    }
+
+    /// <summary>Yazılan harfler listeyi filtreler.</summary>
+    private void List_CharacterReceived(UIElement sender, CharacterReceivedRoutedEventArgs args)
+    {
+        char c = args.Character;
+        if (char.IsControl(c) || IsDown(VirtualKey.Control) || IsDown(VirtualKey.Menu)) return;
+        if (c == ' ' && _filter.Length == 0) return; // Space önizleme
+        if (c is '+' or '-' or '*' && _filter.Length == 0) return; // desen kısayolları
+        _filter += c;
+        UpdateFilter();
+        args.Handled = true;
+    }
+
+    private void UpdateFilter()
+    {
+        UpdateFilterBar();
+        ApplyView(resetItems: false);
+        if (FileList.SelectedItems.Count == 0 || FileList.SelectedItem is FileItem { IsParent: true })
+        {
+            var first = Items.FirstOrDefault(i => !i.IsParent);
+            if (first is not null)
+            {
+                FileList.SelectedItem = first;
+                FileList.ScrollIntoView(first);
+            }
+        }
+        UpdateStatus();
+    }
+
+    private void UpdateFilterBar()
+    {
+        FilterBar.Visibility = _filter.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        FilterText.Text = _filter;
     }
 
     private void List_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         UpdateStatus();
         SelectionChangedEx?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void List_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+    {
+        if (args.InRecycleQueue || args.Item is not FileItem item || item.IsParent || item.Icon is not null) return;
+        // Simgeler yalnızca ekrana gelen satırlar için, ikinci aşamada yüklenir.
+        if (args.Phase == 0)
+        {
+            args.RegisterUpdateCallback(1, (_, a) =>
+            {
+                if (a.Item is FileItem f && f.Icon is null) f.Icon = ShellIcons.Get(f);
+            });
+        }
     }
 
     // ---------------------------------------------------------------- Sağ tık menüsü

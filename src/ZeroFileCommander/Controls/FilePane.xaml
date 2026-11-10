@@ -6,46 +6,123 @@
     xmlns:models="using:ZeroFileCommander.Models"
     GotFocus="OnGotFocus">
 
+    <UserControl.Resources>
+        <Style x:Key="HeaderButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0,2" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+        </Style>
+    </UserControl.Resources>
+
     <Border
         x:Name="RootBorder"
         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
         BorderThickness="1"
         CornerRadius="10">
-        <Grid x:Name="PaneGrid" RowDefinitions="Auto,Auto,*,Auto">
+        <Grid x:Name="PaneGrid" RowDefinitions="Auto,Auto,Auto,*,Auto">
 
-            <!-- Yol çubuğu -->
-            <Grid Grid.Row="0" Padding="8" ColumnSpacing="6" ColumnDefinitions="Auto,*">
+            <!-- Sekmeler -->
+            <TabView
+                x:Name="Tabs"
+                Grid.Row="0"
+                Margin="2,2,2,0"
+                Background="Transparent"
+                TabWidthMode="SizeToContent"
+                CloseButtonOverlayMode="OnPointerOver"
+                IsAddTabButtonVisible="True"
+                CanReorderTabs="True"
+                CanDragTabs="False"
+                AllowDropTabs="False"
+                AddTabButtonClick="Tabs_AddTabButtonClick"
+                TabCloseRequested="Tabs_TabCloseRequested"
+                SelectionChanged="Tabs_SelectionChanged" />
+
+            <!-- Yol çubuğu: tıklanabilir parçalar; ✎ ya da Ctrl+L ile yazarak düzenle -->
+            <Grid Grid.Row="1" Padding="8,4,8,6" ColumnSpacing="6" ColumnDefinitions="Auto,*,Auto">
                 <Button
                     Click="UpButton_Click"
                     ToolTipService.ToolTip="Üst klasör (Backspace)"
                     AutomationProperties.Name="Üst klasör">
                     <FontIcon Glyph="&#xE74A;" FontSize="14" />
                 </Button>
-                <TextBox
-                    x:Name="PathBox"
-                    Grid.Column="1"
-                    KeyDown="PathBox_KeyDown"
-                    AutomationProperties.Name="Klasör yolu" />
+                <Grid Grid.Column="1" MinHeight="32">
+                    <Border
+                        x:Name="CrumbHost"
+                        Padding="6,0"
+                        CornerRadius="6"
+                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        Tapped="CrumbHost_Tapped">
+                        <ScrollViewer
+                            x:Name="CrumbScroller"
+                            HorizontalScrollMode="Auto"
+                            HorizontalScrollBarVisibility="Hidden"
+                            VerticalScrollMode="Disabled"
+                            VerticalScrollBarVisibility="Disabled">
+                            <BreadcrumbBar
+                                x:Name="Crumbs"
+                                VerticalAlignment="Center"
+                                ItemClicked="Crumbs_ItemClicked" />
+                        </ScrollViewer>
+                    </Border>
+                    <TextBox
+                        x:Name="PathBox"
+                        Visibility="Collapsed"
+                        KeyDown="PathBox_KeyDown"
+                        LostFocus="PathBox_LostFocus"
+                        AutomationProperties.Name="Klasör yolu" />
+                </Grid>
+                <Button
+                    Grid.Column="2"
+                    Click="EditPath_Click"
+                    ToolTipService.ToolTip="Yolu yazarak düzenle (Ctrl+L)"
+                    AutomationProperties.Name="Yolu düzenle">
+                    <FontIcon Glyph="&#xE70F;" FontSize="14" />
+                </Button>
             </Grid>
 
-            <!-- Sütun başlıkları -->
+            <!-- Sıralanabilir sütun başlıkları -->
             <Grid
-                Grid.Row="1"
-                Padding="16,4,16,4"
+                Grid.Row="2"
+                Padding="16,0,16,0"
                 ColumnSpacing="8"
-                ColumnDefinitions="24,*,90,130"
+                ColumnDefinitions="24,*,56,90,130"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                 BorderThickness="0,0,0,1">
-                <TextBlock Grid.Column="1" Text="Ad" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                <TextBlock Grid.Column="2" Text="Boyut" HorizontalAlignment="Right" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                <TextBlock Grid.Column="3" Text="Değiştirilme" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Button Grid.Column="1" Style="{StaticResource HeaderButtonStyle}" Tag="Name" Click="SortHeader_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Ad" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <FontIcon x:Name="SortName" FontSize="9" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="2" Style="{StaticResource HeaderButtonStyle}" Tag="Extension" Click="SortHeader_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Uzantı" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <FontIcon x:Name="SortExtension" FontSize="9" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="3" Style="{StaticResource HeaderButtonStyle}" HorizontalContentAlignment="Right" Tag="Size" Click="SortHeader_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon x:Name="SortSize" FontSize="9" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="Boyut" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="4" Style="{StaticResource HeaderButtonStyle}" Tag="Date" Click="SortHeader_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Değiştirilme" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <FontIcon x:Name="SortDate" FontSize="9" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Button>
             </Grid>
 
             <!-- Dosya listesi -->
             <ListView
                 x:Name="FileList"
-                Grid.Row="2"
+                Grid.Row="3"
                 ItemsSource="{x:Bind Items}"
                 SelectionMode="Extended"
                 IsDoubleTapEnabled="True"
@@ -53,8 +130,10 @@
                 AllowDrop="True"
                 DoubleTapped="List_DoubleTapped"
                 KeyDown="List_KeyDown"
+                CharacterReceived="List_CharacterReceived"
                 SelectionChanged="List_SelectionChanged"
                 RightTapped="List_RightTapped"
+                ContainerContentChanging="List_ContainerContentChanging"
                 DragItemsStarting="List_DragItemsStarting"
                 DragItemsCompleted="List_DragItemsCompleted"
                 DragOver="List_DragOver"
@@ -71,23 +150,45 @@
                     <DataTemplate x:DataType="models:FileItem">
                         <Grid
                             ColumnSpacing="8"
-                            ColumnDefinitions="24,*,90,130"
+                            ColumnDefinitions="24,*,56,90,130"
                             Background="Transparent"
                             PointerEntered="Row_PointerEntered"
                             PointerExited="Row_PointerExited">
-                            <FontIcon Glyph="{x:Bind Glyph}" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            <FontIcon Glyph="{x:Bind Glyph}" FontSize="16" Opacity="{x:Bind GlyphOpacity, Mode=OneWay}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            <Image Source="{x:Bind Icon, Mode=OneWay}" Width="20" Height="20" />
                             <TextBlock Grid.Column="1" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="{x:Bind SizeText}" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <TextBlock Grid.Column="3" Text="{x:Bind ModifiedText}" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Grid.Column="2" Text="{x:Bind ExtensionText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Grid.Column="3" Text="{x:Bind SizeText}" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Grid.Column="4" Text="{x:Bind ModifiedText}" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
 
+            <!-- Yazarak filtreleme -->
+            <Border
+                x:Name="FilterBar"
+                Grid.Row="3"
+                Margin="8"
+                Padding="10,6"
+                VerticalAlignment="Bottom"
+                HorizontalAlignment="Left"
+                CornerRadius="8"
+                Visibility="Collapsed"
+                Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                BorderThickness="1">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE71C;" FontSize="13" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                    <TextBlock x:Name="FilterText" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <TextBlock Text="Esc: temizle" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Border>
+
             <!-- Bırakma ipucu -->
             <Border
                 x:Name="DropHint"
-                Grid.Row="2"
+                Grid.Row="3"
                 Margin="8"
                 Padding="12,8"
                 VerticalAlignment="Bottom"
@@ -102,13 +203,13 @@
             <!-- Durum satırı -->
             <TextBlock
                 x:Name="StatusText"
-                Grid.Row="3"
+                Grid.Row="4"
                 Margin="12,6,12,8"
                 Style="{StaticResource CaptionTextBlockStyle}"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
             <!-- Üzerine gelince hızlı bakış -->
-            <Popup x:Name="HoverPopup" Grid.RowSpan="4" IsLightDismissEnabled="False">
+            <Popup x:Name="HoverPopup" Grid.RowSpan="5" IsLightDismissEnabled="False">
                 <Border
                     Width="300"
                     Padding="10"

@@ -36,6 +36,9 @@
             <KeyboardAccelerator Key="E" Modifiers="Control,Shift" Invoked="Accel_Invoked" />
             <KeyboardAccelerator Key="J" Modifiers="Control" Invoked="Accel_Invoked" />
             <KeyboardAccelerator Key="F1" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="T" Modifiers="Control" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="W" Modifiers="Control" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="L" Modifiers="Control" Invoked="Accel_Invoked" />
         </Grid.KeyboardAccelerators>
 
         <!-- Başlık çubuğu (sürüklenebilir alan) -->
@@ -95,7 +98,9 @@
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Tümünü seç" Tag="app:selectall" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+A" />
-                <MenuFlyoutItem Text="Seçimi tersine çevir" Tag="app:invert" Click="Command_Click" />
+                <MenuFlyoutItem Text="Seçimi tersine çevir" Tag="app:invert" Click="Command_Click" KeyboardAcceleratorTextOverride="Num *" />
+                <MenuFlyoutItem Text="Desenle seç…" Tag="app:selectpattern" Click="Command_Click" KeyboardAcceleratorTextOverride="Num +" />
+                <MenuFlyoutItem Text="Desenle seçimi kaldır…" Tag="app:deselectpattern" Click="Command_Click" KeyboardAcceleratorTextOverride="Num −" />
                 <MenuFlyoutItem Text="Yolu kopyala" Tag="CopyPath" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+C">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE71B;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
@@ -155,6 +160,13 @@
                 <MenuFlyoutItem Text="Tepsiye gizle" Tag="app:hide" Click="Command_Click">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE921;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Yeni sekme" Tag="app:newtab" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+T">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xEC6C;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Sekmeyi kapat" Tag="app:closetab" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+W" />
+                <MenuFlyoutItem Text="Sonraki sekme" Tag="app:nexttab" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+Tab" />
+                <MenuFlyoutItem Text="Yolu düzenle" Tag="app:editpath" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+L" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Sol panele odaklan" Tag="app:focusleft" Click="Command_Click" />
                 <MenuFlyoutItem Text="Sağ panele odaklan" Tag="app:focusright" Click="Command_Click" />
@@ -340,7 +352,7 @@
                 VerticalAlignment="Center"
                 Style="{StaticResource CaptionTextBlockStyle}"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="Tab: panel değiştir · Sürükle: taşı, Ctrl: kopyala" />
+                Text="Tab: panel · Ctrl+T: sekme · Insert: işaretle · yaz: filtrele" />
         </Grid>
     </Grid>
 </Window>
