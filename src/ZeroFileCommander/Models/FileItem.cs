@@ -3,13 +3,13 @@ namespace ZeroFileCommander.Models;
 /// <summary>Bir paneldeki tek satır: sürücü, klasör, dosya ya da "..".</summary>
 public sealed class FileItem
 {
-    public required string Name { get; init; }
-    public required string FullPath { get; init; }
-    public bool IsDirectory { get; init; }
-    public bool IsParent { get; init; }
-    public bool IsDrive { get; init; }
-    public long? Size { get; init; }
-    public DateTime? Modified { get; init; }
+    public string Name { get; set; } = string.Empty;
+    public string FullPath { get; set; } = string.Empty;
+    public bool IsDirectory { get; set; }
+    public bool IsParent { get; set; }
+    public bool IsDrive { get; set; }
+    public long? Size { get; set; }
+    public DateTime? Modified { get; set; }
 
     public string Extension =>
         IsDirectory ? string.Empty : Path.GetExtension(Name).TrimStart('.').ToUpperInvariant();
