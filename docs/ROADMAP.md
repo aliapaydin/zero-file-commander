@@ -2,7 +2,7 @@
 
 Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor (bkz. [DESIGN.md](DESIGN.md)).
 
-## v0.1: İskelet ✅ (bu commit)
+## v0.1: İskelet ✅
 - [x] WinUI 3 + Windows App SDK + .NET 10, MSIX paketleme
 - [x] Mica arka plan, özel başlık çubuğu, logo
 - [x] İki panel: sürücü listesi, klasörde gezinme, `..` ile üst klasöre çıkma
@@ -25,7 +25,15 @@ Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor
 - [x] Konumu ayarlanabilen modern bildirim kutusu
 - [x] Ayarlar, Hakkında, Klavye kısayolları, Özellikler pencereleri
 
-## v0.2.x: Commander temelleri
+## v0.3: Önizleme ve yerleşim ✅
+- [x] Office belgeleri (Word, Excel, PowerPoint, Visio, Outlook…) Windows önizleyicisiyle, sayfa sayfa
+- [x] PDF'lerde sayfa gezinme (düğmeler ve fare tekeri), görsellerde yakınlaştırma
+- [x] Sağ tık menüsü tıklanan noktadan açılıyor; boş alanda "Yeni" alt menüsü (Dosya Gezgini'nin şablonları)
+- [x] Paneller arası sürüklenebilir ayırıcılar (çift tık: varsayılan)
+- [x] Pencere konum/boyutu, panel genişlikleri, son klasörler hatırlanıyor; ayarlardan sıfırlama
+- [x] Hata günlüğü (Yardım → Hata günlüğünü aç), beklenmeyen hatalarda uygulama kapanmıyor
+
+## v0.3.x: Commander temelleri
 - [ ] Sekmeler (Ctrl+T, Ctrl+W, sekmeyi diğer panele sürükleme)
 - [ ] Sürücü çipleri ve doluluk göstergesi, tıklanabilir yol çubuğu (breadcrumb)
 - [ ] Insert/Space ile işaretleme, renkli işaretli dosyalar
@@ -37,13 +45,13 @@ Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor
 - [ ] Tek örnek (single instance): ikinci açılış mevcut pencereyi öne getirsin
 - [ ] Ayarların kalıcı olması (son klasörler, panel başına görünüm)
 
-## v0.3: Önizleme
+## v0.4: Önizleme ve düzenleme
 - [ ] Önizle ve düzenle ekranı: bölünmüş görünüm, sözdizimi renklendirme, kaydetme
-- [ ] CSV/Excel tablo önizlemesi, PDF sayfaları arasında gezinme
+- [ ] CSV tablo önizlemesi
 - [ ] Hızlı bakış kartında sabitleme (P) ve Space ile tam ekran
 - [ ] Video sahne şeridi
 
-## v0.4: Görünümler ve tema
+## v0.4.x: Görünümler
 - [ ] Detay, Liste, Simgeler ve Galeri modları, panel başına ayrı mod
 - [ ] Ctrl + fare tekeri ile boyutlandırma (5 kademe)
 - [ ] Küçük resim önbelleği (Windows thumbnail cache ve kendi disk önbelleğimiz)
