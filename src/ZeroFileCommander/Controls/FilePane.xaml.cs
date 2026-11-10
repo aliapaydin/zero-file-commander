@@ -288,7 +288,7 @@ public sealed partial class FilePane : UserControl
             menu.PrimaryCommands.Add(MenuButton("Yeniden adlandır", "", PaneCommand.Rename, "F2", enabled: single));
             menu.PrimaryCommands.Add(MenuButton("Sil", "", PaneCommand.Delete, "Del"));
 
-            menu.SecondaryCommands.Add(Button(item.IsDirectory ? "Aç" : "Aç", "", PaneCommand.Open, "Enter"));
+            menu.SecondaryCommands.Add(MenuButton("Aç", "", PaneCommand.Open, "Enter"));
             if (!item.IsDirectory)
             {
                 menu.SecondaryCommands.Add(MenuButton("Birlikte aç…", "", PaneCommand.OpenWith));
