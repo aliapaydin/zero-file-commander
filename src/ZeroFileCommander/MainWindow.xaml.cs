@@ -523,7 +523,7 @@ public sealed partial class MainWindow : Window, IPaneHost
     private async Task CompressAsync(FilePane pane, IReadOnlyList<FileItem> items)
     {
         if (items.Count == 0 || !pane.IsFileSystemFolder) return;
-        var baseName = items.Count == 1 ? Path.GetFileNameWithoutExtension(items[0].Name) : Path.GetFileName(pane.CurrentPath.TrimEnd('\'));
+        var baseName = items.Count == 1 ? Path.GetFileNameWithoutExtension(items[0].Name) : Path.GetFileName(pane.CurrentPath.TrimEnd('\\'));
         if (string.IsNullOrWhiteSpace(baseName)) baseName = "Arşiv";
         var suggested = Path.GetFileName(ShellNew.UniquePath(Path.Combine(pane.CurrentPath, baseName + ".zip")));
         var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "ZIP olarak sıkıştır", suggested, "Sıkıştır", selectStem: true);
