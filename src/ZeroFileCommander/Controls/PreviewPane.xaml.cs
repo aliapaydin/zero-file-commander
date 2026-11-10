@@ -73,9 +73,7 @@ public sealed partial class PreviewPane : UserControl
             switch (item.Kind)
             {
                 case FileKind.Folder:
-                    var (folders, files, capped) = await FilePreview.CountAsync(item.FullPath);
-                    if (version != _version) return;
-                    ShowPlaceholder("", capped ? "10.000+ öğe" : $"{folders} klasör, {files} dosya");
+                    await ShowFolderAsync(item, version);
                     break;
 
                 case FileKind.Image:
@@ -165,6 +163,75 @@ public sealed partial class PreviewPane : UserControl
         Player.PosterSource = null;
         CloseHandler();
         _pdf = null;
+    }
+
+    // ---------------------------------------------------------------- Klasör içeriği
+
+    private const int FolderPreviewMax = 80;
+
+    private async Task ShowFolderAsync(FileItem folder, int version)
+    {
+        var countTask = FilePreview.CountAsync(folder.FullPath);
+        var entries = await FilePreview.ListFolderAsync(folder.FullPath, FolderPreviewMax);
+        var (folders, files, capped) = await countTask;
+        if (version != _version) return;
+
+        if (entries.Count == 0)
+        {
+            ShowPlaceholder("\uE8B7", "Klasör boş");
+            return;
+        }
+
+        int total = folders + files;
+        FolderSummary.Text = capped
+            ? "10.000+ öğe"
+            : total > entries.Count
+                ? $"{folders} klasör, {files} dosya · ilk {entries.Count} gösteriliyor"
+                : $"{folders} klasör, {files} dosya";
+        ExtraText.Text = $"{folders} klasör, {files} dosya";
+
+        FolderGrid.Children.Clear();
+        var thumbnails = new List<(FileItem Entry, Image Target)>();
+        foreach (var entry in entries)
+        {
+            var tile = new StackPanel { Spacing = 6, Padding = new Thickness(4), HorizontalAlignment = HorizontalAlignment.Center };
+            var iconHost = new Grid { Width = 56, Height = 48, HorizontalAlignment = HorizontalAlignment.Center };
+            iconHost.Children.Add(new FontIcon
+            {
+                Glyph = entry.Glyph,
+                FontSize = 32,
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AccentTextFillColorPrimaryBrush"],
+            });
+            if (entry.Kind is FileKind.Image or FileKind.Video or FileKind.Pdf)
+            {
+                var image = new Image { Stretch = Microsoft.UI.Xaml.Media.Stretch.UniformToFill };
+                var frame = new Border { CornerRadius = new CornerRadius(6), Child = image };
+                iconHost.Children.Add(frame);
+                thumbnails.Add((entry, image));
+            }
+            tile.Children.Add(iconHost);
+            tile.Children.Add(new TextBlock
+            {
+                Text = entry.Name,
+                FontSize = 11,
+                TextAlignment = TextAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxLines = 2,
+                MaxWidth = 76,
+            });
+            FolderGrid.Children.Add(tile);
+        }
+        FolderScroller.Visibility = Visibility.Visible;
+        FolderScroller.ChangeView(null, 0, null, disableAnimation: true);
+
+        // Küçük resimler sırayla gelsin (ilk 40).
+        foreach (var (entry, target) in thumbnails.Take(40))
+        {
+            var bitmap = await FilePreview.GetVisualAsync(entry.FullPath, entry.Kind, 96);
+            if (version != _version) return;
+            if (bitmap is not null) target.Source = bitmap;
+        }
     }
 
     // ---------------------------------------------------------------- PDF (sayfalar alt alta)
@@ -277,18 +344,27 @@ public sealed partial class PreviewPane : UserControl
     private void ScrollToPage(int delta)
     {
         if (_pdfPages.Count == 0) return;
-        double top = ImageScroller.VerticalOffset;
+
+        // Sayfaların başlangıç konumları
+        var offsets = new List<double>(_pdfPages.Count);
         double y = 6;
-        int current = 0;
-        var offsets = new List<double>();
-        for (int i = 0; i < _pdfPages.Count; i++)
+        foreach (var page in _pdfPages)
         {
             offsets.Add(y);
-            if (y <= top + 4) current = i;
-            y += _pdfPages[i].Height + 8;
+            y += page.Height + 8;
         }
+
+        // Görünümün üst kenarının (biraz altının) düştüğü sayfa = şu anki sayfa
+        double probe = ImageScroller.VerticalOffset + 12;
+        int current = 0;
+        for (int i = 0; i < offsets.Count; i++)
+        {
+            if (offsets[i] <= probe) current = i;
+            else break;
+        }
+
         int target = Math.Clamp(current + delta, 0, _pdfPages.Count - 1);
-        ImageScroller.ChangeView(null, Math.Max(0, offsets[target] - 6), null);
+        ImageScroller.ChangeView(null, offsets[target], null, disableAnimation: true);
     }
 
     // ---------------------------------------------------------------- Windows önizleyicisi
@@ -383,6 +459,8 @@ public sealed partial class PreviewPane : UserControl
         ImageScroller.ChangeView(0, 0, null, disableAnimation: true);
         PreviewText.Text = string.Empty;
         TextScroller.Visibility = Visibility.Collapsed;
+        FolderScroller.Visibility = Visibility.Collapsed;
+        FolderGrid.Children.Clear();
         HandlerSurface.Visibility = Visibility.Collapsed;
         PageBar.Visibility = Visibility.Collapsed;
         Placeholder.Visibility = Visibility.Collapsed;

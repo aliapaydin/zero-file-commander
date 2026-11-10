@@ -64,6 +64,23 @@
                         TextWrapping="Wrap"
                         IsTextSelectionEnabled="True" />
                 </ScrollViewer>
+                <!-- Klasör içeriği: yalnızca bilgi amaçlı, sönük ve tıklanamaz -->
+                <ScrollViewer
+                    x:Name="FolderScroller"
+                    Visibility="Collapsed"
+                    HorizontalScrollMode="Disabled"
+                    HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Padding="10" Spacing="10">
+                        <TextBlock x:Name="FolderSummary" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <VariableSizedWrapGrid
+                            x:Name="FolderGrid"
+                            Orientation="Horizontal"
+                            ItemWidth="84"
+                            ItemHeight="96"
+                            Opacity="0.55"
+                            IsHitTestVisible="False" />
+                    </StackPanel>
+                </ScrollViewer>
                 <!-- Office vb. için Windows önizleyicisinin çizdiği alan -->
                 <Border x:Name="HandlerSurface" Visibility="Collapsed" Background="White" />
                 <StackPanel

@@ -264,6 +264,9 @@ public sealed partial class FilePane : UserControl
         Activated?.Invoke(this, EventArgs.Empty);
 
         var menu = BuildContextMenu(item is { IsEntry: true } ? item : null);
+        // Menüyü pencere içinde çiz: ayrı açılır pencere olunca imleç, kenarındaki
+        // boyutlandırma alanına denk gelip ↕ şekline dönüyordu.
+        menu.ShouldConstrainToRootBounds = true;
         Overlay.Track(menu);
         menu.Opened += (_, _) => CursorHelper.ApplyToOpenPopups(XamlRoot);
         // Menü, tıklanan noktadan sağa-aşağı açılır (sol üst köşesi imleçte).
@@ -339,7 +342,7 @@ public sealed partial class FilePane : UserControl
             if (!IsDriveList)
             {
                 var newButton = new AppBarButton { Label = "Yeni", Icon = new FontIcon { Glyph = "\uE710" } };
-                var newMenu = new MenuFlyout { Placement = FlyoutPlacementMode.RightEdgeAlignedTop };
+                var newMenu = new MenuFlyout { Placement = FlyoutPlacementMode.RightEdgeAlignedTop, ShouldConstrainToRootBounds = true };
                 NewMenu.Populate(newMenu.Items, entry => _ = Host?.CreateNewAsync(this, entry));
                 newMenu.Opened += (_, _) => CursorHelper.ApplyToOpenPopups(XamlRoot);
                 newButton.Flyout = newMenu;

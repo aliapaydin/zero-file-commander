@@ -19,7 +19,6 @@ public static class Notifier
     private const int LogicalWidth = 380;
     private const int LogicalHeight = 132;
     private const int Margin = 16;
-    private const int SW_SHOWNOACTIVATE = 4;
     private static readonly List<Window> Open = new();
 
     public static void Show(string title, string message, string glyph = "", params NotificationAction[] actions)
@@ -77,8 +76,11 @@ public static class Notifier
         Open.Add(window);
         appWindow.MoveAndResize(ComputeRect(width, height, Open.Count - 1, scale));
 
-        // Odağı çalmadan göster.
-        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+        // WinUI penceresi içeriğini ancak etkinleştirilince çiziyor. Etkinleştir,
+        // sonra odağı hemen önceki pencereye geri ver (kullanıcının yazdığı yer kaybolmasın).
+        var previous = GetForegroundWindow();
+        window.Activate();
+        if (previous != IntPtr.Zero && previous != hwnd) SetForegroundWindow(previous);
 
         // Otomatik kapanma; fare üzerindeyken bekler.
         bool hovering = false;
@@ -234,7 +236,10 @@ public static class Notifier
     private static extern uint GetDpiForWindow(IntPtr hwnd);
 
     [DllImport("user32.dll")]
-    private static extern bool ShowWindow(IntPtr hwnd, int command);
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
 }
 
 public static class ThemeHelper

@@ -110,6 +110,30 @@ public static class FilePreview
         }
     });
 
+    /// <summary>Klasörün ilk öğeleri (önce klasörler, ada göre).</summary>
+    public static Task<List<FileItem>> ListFolderAsync(string folder, int max) => Task.Run(() =>
+    {
+        var result = new List<FileItem>();
+        try
+        {
+            var options = new EnumerationOptions
+            {
+                IgnoreInaccessible = true,
+                AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
+            };
+            var dir = new DirectoryInfo(folder);
+            foreach (var d in dir.EnumerateDirectories("*", options).OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase).Take(max))
+                result.Add(new FileItem { Name = d.Name, FullPath = d.FullName, IsDirectory = true });
+            foreach (var f in dir.EnumerateFiles("*", options).OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase).Take(max - result.Count))
+                result.Add(new FileItem { Name = f.Name, FullPath = f.FullName, Size = f.Length });
+        }
+        catch
+        {
+            // erişim yok
+        }
+        return result;
+    });
+
     /// <summary>Klasördeki öğe sayısı (ilk 10.000'e kadar).</summary>
     public static Task<(int Folders, int Files, bool Capped)> CountAsync(string folder) => Task.Run(() =>
     {
