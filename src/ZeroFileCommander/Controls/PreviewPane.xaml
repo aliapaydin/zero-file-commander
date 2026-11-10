@@ -147,6 +147,11 @@
                         TextWrapping="Wrap"
                         MaxWidth="220"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Button
+                        x:Name="PlaceholderAction"
+                        Visibility="Collapsed"
+                        HorizontalAlignment="Center"
+                        Click="PlaceholderAction_Click" />
                 </StackPanel>
                 <ProgressRing x:Name="LoadingRing" Width="28" Height="28" IsActive="False" />
             </Grid>

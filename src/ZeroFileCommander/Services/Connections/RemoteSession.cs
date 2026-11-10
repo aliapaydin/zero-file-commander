@@ -81,7 +81,7 @@ public static class RemotePath
 
     /// <summary>Panelde görünen tam adres: sftp://kullanici@sunucu/yol</summary>
     public static string ToUri(SavedConnection connection, string path) =>
-        connection.RootUri + (Normalize(path) == "/" ? "/" : Normalize(path));
+        path.Length == 0 ? connection.RootUri : connection.RootUri + Normalize(path);
 
     /// <summary>Adresi kayıtlı bağlantıya ve uzak yola ayırır.</summary>
     public static bool TryParse(string uri, out SavedConnection connection, out string path)
@@ -92,8 +92,9 @@ public static class RemotePath
         var found = ConnectionStore.FindByUri(uri);
         if (found is null) return false;
         connection = found;
-        string rest = uri.Length > found.RootUri.Length ? uri[found.RootUri.Length..] : "/";
-        path = Normalize(Uri.UnescapeDataString(rest));
+        // Yol yoksa kullanıcının ev klasörü ("" = sunucudan sorulacak).
+        string rest = uri.Length > found.RootUri.Length ? uri[found.RootUri.Length..] : string.Empty;
+        path = rest.Length == 0 ? string.Empty : Normalize(Uri.UnescapeDataString(rest));
         return true;
     }
 
@@ -101,6 +102,60 @@ public static class RemotePath
         path.StartsWith("sftp://", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("ftps://", StringComparison.OrdinalIgnoreCase);
+}
+
+/// <summary>Uzak dosyaları açmak/önizlemek için geçici klasöre indirir.</summary>
+public static class RemoteFiles
+{
+    private static readonly string TempRoot = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ZeroFileCommander", "remote");
+
+    public static async Task<string> DownloadToTempAsync(SavedConnection connection, string remotePath, string name, CancellationToken token)
+    {
+        // Aynı dosya için aynı klasör: tekrar açınca yeniden kullanılabilsin, farklı sunucular karışmasın.
+        string hash = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(
+            System.Text.Encoding.UTF8.GetBytes(connection.Id + "|" + remotePath)))[..12];
+        string folder = System.IO.Path.Combine(TempRoot, hash);
+        Directory.CreateDirectory(folder);
+        string safeName = string.Concat(name.Select(c => System.IO.Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+        string target = System.IO.Path.Combine(folder, safeName);
+        string partial = target + ".zfcpart";
+
+        var session = await RemoteSessions.GetAsync(connection, token);
+        try
+        {
+            await using (var file = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, useAsync: true))
+                await session.DownloadAsync(remotePath, file, token);
+            if (File.Exists(target)) File.SetAttributes(target, FileAttributes.Normal);
+            File.Move(partial, target, overwrite: true);
+            // Kullanıcı yanlışlıkla düzenleyip sunucuya gittiğini sanmasın.
+            File.SetAttributes(target, FileAttributes.ReadOnly);
+            return target;
+        }
+        catch
+        {
+            try { if (File.Exists(partial)) File.Delete(partial); } catch (IOException) { }
+            throw;
+        }
+    }
+
+    public static void CleanTemp()
+    {
+        try
+        {
+            if (!Directory.Exists(TempRoot)) return;
+            foreach (var file in Directory.EnumerateFiles(TempRoot, "*", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    File.SetAttributes(file, FileAttributes.Normal);
+                    File.Delete(file);
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
+        catch (IOException) { }
+    }
 }
 
 /// <summary>Oturumları yönetir: paneller bağlantı başına bir oturumu paylaşır; aktarımlar kendi oturumunu açar.</summary>

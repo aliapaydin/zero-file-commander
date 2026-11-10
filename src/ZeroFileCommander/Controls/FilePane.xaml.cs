@@ -16,6 +16,7 @@ using DispatcherQueuePriority = Microsoft.UI.Dispatching.DispatcherQueuePriority
 using DispatcherQueueTimer = Microsoft.UI.Dispatching.DispatcherQueueTimer;
 using ZeroFileCommander.Models;
 using ZeroFileCommander.Services;
+using ZeroFileCommander.Services.Connections;
 using ZeroFileCommander.Views;
 
 namespace ZeroFileCommander.Controls;
@@ -78,8 +79,16 @@ public sealed partial class FilePane : UserControl
 
     public bool IsInArchive => ArchiveFile is not null;
 
-    /// <summary>Gerçek bir dosya sistemi klasörü mü (sürücü listesi ya da arşiv değil).</summary>
-    public bool IsFileSystemFolder => !IsDriveList && !IsInArchive;
+    /// <summary>Panel bir uzak bağlantıyı (SFTP/FTP) gösteriyorsa o bağlantı.</summary>
+    public SavedConnection? Remote { get; private set; }
+
+    /// <summary>Uzak bağlantıdaki açık klasör ("/a/b").</summary>
+    public string RemoteDir { get; private set; } = "/";
+
+    public bool IsRemote => Remote is not null;
+
+    /// <summary>Gerçek bir dosya sistemi klasörü mü (sürücü listesi, arşiv ya da uzak bağlantı değil).</summary>
+    public bool IsFileSystemFolder => !IsDriveList && !IsInArchive && !IsRemote;
 
     public IPaneHost? Host { get; set; }
 
@@ -104,7 +113,16 @@ public sealed partial class FilePane : UserControl
         _refreshTimer.Interval = TimeSpan.FromMilliseconds(350);
         _refreshTimer.Tick += (_, _) => Refresh();
 
-        Unloaded += (_, _) => StopWatching();
+        Unloaded += (_, _) =>
+        {
+            StopWatching();
+            ConnectionStore.Changed -= ConnectionStore_Changed;
+        };
+        Loaded += (_, _) =>
+        {
+            ConnectionStore.Changed -= ConnectionStore_Changed;
+            ConnectionStore.Changed += ConnectionStore_Changed;
+        };
         UpdateSortIndicators();
     }
 
@@ -237,6 +255,13 @@ public sealed partial class FilePane : UserControl
         if (item.Tag is not PaneTab tab) return;
         string name;
         if (tab.Path.Length == 0) name = "Bu bilgisayar";
+        else if (RemotePath.LooksRemote(tab.Path))
+        {
+            // sftp://kullanici@sunucu/a/b → "b" (kökte sunucu adı)
+            var rest = tab.Path[(tab.Path.IndexOf("://", StringComparison.Ordinal) + 3)..].TrimEnd('/');
+            int slash = rest.LastIndexOf('/');
+            name = slash >= 0 ? Uri.UnescapeDataString(rest[(slash + 1)..]) : rest[(rest.IndexOf('@') + 1)..];
+        }
         else
         {
             name = Path.GetFileName(tab.Path.TrimEnd('\\'));
@@ -290,6 +315,19 @@ public sealed partial class FilePane : UserControl
         var previous = CurrentPath;
         bool sameFolder = string.Equals(previous, path, StringComparison.OrdinalIgnoreCase) && Items.Count > 0;
 
+        // Uzak bağlantılar ve henüz doğrulanmamış ağ paylaşımları arka planda açılır.
+        if (RemotePath.LooksRemote(path))
+        {
+            _ = NavigateRemoteAsync(path, previous, sameFolder);
+            return;
+        }
+        if (path.StartsWith(@"\\", StringComparison.Ordinal) && !VerifiedShares.Contains(ShareRootOf(path)))
+        {
+            _ = NavigateShareAsync(path);
+            return;
+        }
+        ++_remoteVersion; // bekleyen uzak gezinme varsa sonucu yok sayılsın
+
         List<FileItem> loaded;
         string? archive = null;
         string inner = string.Empty;
@@ -319,6 +357,13 @@ public sealed partial class FilePane : UserControl
             return;
         }
 
+        ApplyLoaded(path, loaded, archive, inner, previous, sameFolder, null, "/");
+    }
+
+    /// <summary>Yüklenen listeyi panele uygular (yerel, arşiv ve uzak gezinmenin ortak sonu).</summary>
+    private void ApplyLoaded(string path, List<FileItem> loaded, string? archive, string inner, string previous, bool sameFolder,
+        SavedConnection? remote, string remoteDir)
+    {
         if (!sameFolder)
         {
             _filter = string.Empty;
@@ -338,6 +383,8 @@ public sealed partial class FilePane : UserControl
         CurrentPath = path;
         ArchiveFile = archive;
         ArchiveInner = inner;
+        Remote = remote;
+        RemoteDir = remoteDir;
         _all = loaded;
         if (CurrentTab is { } tab)
         {
@@ -353,7 +400,7 @@ public sealed partial class FilePane : UserControl
             var reselect = Items.FirstOrDefault(i => !i.IsParent && string.Equals(i.FullPath.TrimEnd('\\'), previous.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
             FileList.SelectedItem = reselect ?? Items.FirstOrDefault();
             if (FileList.SelectedItem is not null) FileList.ScrollIntoView(FileList.SelectedItem);
-            if (archive is null) Watch(path);
+            if (archive is null && remote is null) Watch(path);
             else StopWatching();
         }
 
@@ -363,6 +410,157 @@ public sealed partial class FilePane : UserControl
     }
 
     public void Refresh() => Navigate(CurrentPath);
+
+    // ================================================================ Uzak bağlantılar ve ağ paylaşımları
+
+    private int _remoteVersion;
+    private static readonly HashSet<string> VerifiedShares = new(StringComparer.OrdinalIgnoreCase);
+
+    private async Task NavigateRemoteAsync(string uri, string previous, bool sameFolder)
+    {
+        int version = ++_remoteVersion;
+        if (!RemotePath.TryParse(uri, out var connection, out var path))
+        {
+            StatusText.Text = "Bu adres için kayıtlı bağlantı yok: " + uri;
+            return;
+        }
+        if (Host is null) return;
+        if (!sameFolder) StatusText.Text = $"{connection.Name}: bağlanılıyor…";
+        try
+        {
+            var session = await Host.ConnectRemoteAsync(connection);
+            if (version != _remoteVersion) return;
+            if (session is null)
+            {
+                UpdateStatus();
+                return;
+            }
+            if (!sameFolder) StatusText.Text = $"{connection.Name}: listeleniyor…";
+            if (path.Length == 0) path = RemotePath.Normalize(await session.GetHomeAsync(CancellationToken.None));
+            var entries = await session.ListAsync(path, CancellationToken.None);
+            if (version != _remoteVersion) return;
+
+            var loaded = new List<FileItem>
+            {
+                new()
+                {
+                    Name = "..",
+                    FullPath = path == "/" ? string.Empty : RemotePath.ToUri(connection, RemotePath.Parent(path)),
+                    IsDirectory = true,
+                    IsParent = true,
+                },
+            };
+            foreach (var entry in entries)
+            {
+                loaded.Add(new FileItem
+                {
+                    Name = entry.Name,
+                    FullPath = RemotePath.ToUri(connection, entry.Path),
+                    IsDirectory = entry.IsDirectory,
+                    Size = entry.IsDirectory ? null : entry.Size,
+                    Modified = entry.Modified,
+                    RemoteId = connection.Id,
+                    RemotePath = entry.Path,
+                });
+            }
+            ApplyLoaded(RemotePath.ToUri(connection, path), loaded, null, string.Empty, previous, sameFolder, connection, path);
+        }
+        catch (Exception ex)
+        {
+            if (version != _remoteVersion) return;
+            StatusText.Text = ex is DirectoryNotFoundException ? "Uzak klasör bulunamadı: " + path : ex.Message;
+            // Oturum kopmuş olabilir; sonraki denemede yeniden bağlansın.
+            if (ex is IOException or Renci.SshNet.Common.SshException or ObjectDisposedException)
+                RemoteSessions.Close(connection.Id);
+        }
+    }
+
+    private static string ShareRootOf(string unc)
+    {
+        var parts = unc.TrimStart('\\').Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $@"\\{parts[0]}\{parts[1]}" : unc;
+    }
+
+    /// <summary>
+    /// Ağ paylaşımını arka planda dener (ulaşılamayan sunucu arayüzü dondurmasın); erişim reddedilirse
+    /// kayıtlı bağlantının kimlik bilgisiyle bağlanır.
+    /// </summary>
+    private async Task NavigateShareAsync(string unc)
+    {
+        int version = ++_remoteVersion;
+        string root = ShareRootOf(unc);
+        StatusText.Text = $"{root} açılıyor…";
+
+        var (ok, error) = await ProbeAsync(unc);
+        if (!ok)
+        {
+            var saved = ConnectionStore.All.FirstOrDefault(c => c.Kind == ConnectionKind.Smb &&
+                string.Equals(c.ShareRoot, root, StringComparison.OrdinalIgnoreCase));
+            if (saved is not null)
+            {
+                int result = await Task.Run(() => NetworkShares.Connect(root, saved.User, ConnectionStore.GetPassword(saved)));
+                if (result != 0) error = NetworkShares.Describe(result);
+                else (ok, error) = await ProbeAsync(unc);
+            }
+            else if (error == "denied")
+            {
+                error = "Erişim reddedildi. Kullanıcı adı ve parolayla bağlanmak için Bağlantılar → Yeni bağlantı… ile bu paylaşımı kaydedin.";
+            }
+        }
+        if (version != _remoteVersion) return;
+        if (!ok)
+        {
+            StatusText.Text = error == "denied" ? "Erişim reddedildi." : error ?? "Ağ konumuna ulaşılamadı.";
+            return;
+        }
+        VerifiedShares.Add(root);
+        Navigate(unc);
+    }
+
+    private static async Task<(bool Ok, string? Error)> ProbeAsync(string path)
+    {
+        var probe = Task.Run<(bool, string?)>(() =>
+        {
+            try
+            {
+                using var entries = Directory.EnumerateFileSystemEntries(path).GetEnumerator();
+                entries.MoveNext();
+                return (true, null);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return (false, "denied");
+            }
+            catch (Exception ex) when (ex is IOException or System.Security.SecurityException or ArgumentException)
+            {
+                return (false, ex.Message);
+            }
+        });
+        var finished = await Task.WhenAny(probe, Task.Delay(TimeSpan.FromSeconds(12)));
+        return finished == probe ? probe.Result : (false, "Ağ konumu yanıt vermedi (zaman aşımı).");
+    }
+
+    private void ConnectionStore_Changed(object? sender, EventArgs e)
+    {
+        if (IsDriveList) DispatcherQueue.TryEnqueue(Refresh);
+    }
+
+    /// <summary>Uzak dosyayı geçici klasöre indirip açar (salt okunur kopya).</summary>
+    private async Task OpenRemoteFileAsync(FileItem item)
+    {
+        if (Remote is not { } connection || item.RemotePath is null) return;
+        try
+        {
+            StatusText.Text = $"{item.Name} indiriliyor…";
+            var temp = await RemoteFiles.DownloadToTempAsync(connection, item.RemotePath, item.Name, CancellationToken.None);
+            ShellActions.Open(temp);
+            UpdateStatus();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = ex.Message;
+        }
+    }
 
     // ================================================================ Git durumu
 
@@ -376,7 +574,7 @@ public sealed partial class FilePane : UserControl
         try
         {
             string path = CurrentPath;
-            if (IsDriveList || IsInArchive || !AppSettings.Current.ShowGitStatus || IsSlowPath(path))
+            if (IsDriveList || IsInArchive || IsRemote || !AppSettings.Current.ShowGitStatus || IsSlowPath(path))
             {
                 ClearGit();
                 return;
@@ -467,6 +665,11 @@ public sealed partial class FilePane : UserControl
     public void GoUp()
     {
         if (IsDriveList) return;
+        if (Remote is { } remote)
+        {
+            Navigate(RemoteDir == "/" ? string.Empty : RemotePath.ToUri(remote, RemotePath.Parent(RemoteDir)));
+            return;
+        }
         Navigate(Directory.GetParent(CurrentPath)?.FullName ?? string.Empty);
     }
 
@@ -532,6 +735,8 @@ public sealed partial class FilePane : UserControl
             Navigate(item.FullPath);
         else if (item.IsInArchive)
             _ = OpenArchiveEntryAsync(item);
+        else if (item.IsRemote)
+            _ = OpenRemoteFileAsync(item);
         else if (ArchiveService.IsArchive(item.FullPath))
             Navigate(item.FullPath); // ZIP'e klasör gibi gir
         else
@@ -580,6 +785,27 @@ public sealed partial class FilePane : UserControl
             }
             list.Add(new FileItem { Name = label, FullPath = drive.RootDirectory.FullName, IsDirectory = true, IsDrive = true });
         }
+        try
+        {
+            foreach (var cloud in CloudFolders.Get())
+                list.Add(new FileItem { Name = cloud.Name, FullPath = cloud.Path, IsDirectory = true, IsDrive = true, GlyphOverride = "\uE753" });
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write("Bulut klasörleri", ex);
+        }
+        foreach (var connection in ConnectionStore.All)
+        {
+            list.Add(new FileItem
+            {
+                Name = $"{connection.Name}  ·  {connection.KindLabel}",
+                FullPath = connection.Kind == ConnectionKind.Smb ? connection.UncPath
+                    : connection.Path.Trim().Length > 0 ? RemotePath.ToUri(connection, connection.Path) : connection.RootUri,
+                IsDirectory = true,
+                IsDrive = true,
+                GlyphOverride = connection.Glyph,
+            });
+        }
         return list;
     }
 
@@ -596,7 +822,18 @@ public sealed partial class FilePane : UserControl
         foreach (var d in dir.EnumerateDirectories("*", Enumeration))
             list.Add(new FileItem { Name = d.Name, FullPath = d.FullName, IsDirectory = true, Modified = d.LastWriteTime });
         foreach (var f in dir.EnumerateFiles("*", Enumeration))
-            list.Add(new FileItem { Name = f.Name, FullPath = f.FullName, Size = f.Length, Modified = f.LastWriteTime });
+        {
+            var attributes = f.Attributes;
+            list.Add(new FileItem
+            {
+                Name = f.Name,
+                FullPath = f.FullName,
+                Size = f.Length,
+                Modified = f.LastWriteTime,
+                IsOnlineOnly = CloudState.IsOnlineOnly(attributes),
+                IsPinned = CloudState.IsPinned(attributes),
+            });
+        }
         return list;
     }
 
@@ -708,8 +945,9 @@ public sealed partial class FilePane : UserControl
         }
         int dirs = _all.Count(i => i.IsDirectory && !i.IsParent);
         int files = _all.Count(i => !i.IsDirectory);
-        string text = IsDriveList ? $"{dirs} sürücü" : $"{dirs} klasör, {files} dosya";
+        string text = IsDriveList ? $"{dirs} konum" : $"{dirs} klasör, {files} dosya";
         if (IsInArchive) text = $"ZIP · {text}";
+        if (Remote is { } remote) text = $"{remote.KindLabel} · {remote.Name} · {text}";
         if (_filter.Length > 0) text += $" · filtre: {Items.Count(i => !i.IsParent)} eşleşme";
         StatusText.Text = text;
     }
@@ -786,7 +1024,19 @@ public sealed partial class FilePane : UserControl
         var names = new List<string> { "Bu bilgisayar" };
         _crumbPaths.Clear();
         _crumbPaths.Add(string.Empty);
-        if (!IsDriveList)
+        if (Remote is { } remote)
+        {
+            names.Add(remote.Name);
+            _crumbPaths.Add(RemotePath.ToUri(remote, "/"));
+            string walked = string.Empty;
+            foreach (var part in RemoteDir.Split('/', StringSplitOptions.RemoveEmptyEntries))
+            {
+                walked += "/" + part;
+                names.Add(part);
+                _crumbPaths.Add(RemotePath.ToUri(remote, walked));
+            }
+        }
+        else if (!IsDriveList)
         {
             var parts = new Stack<DirectoryInfo>();
             for (var d = new DirectoryInfo(CurrentPath); d is not null; d = d.Parent) parts.Push(d);
@@ -1123,7 +1373,7 @@ public sealed partial class FilePane : UserControl
     private void List_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
     {
         HideHover();
-        var paths = e.Items.OfType<FileItem>().Where(i => i.IsEntry && !i.IsInArchive).Select(i => i.FullPath).ToList();
+        var paths = e.Items.OfType<FileItem>().Where(i => i.IsEntry && !i.IsVirtual).Select(i => i.FullPath).ToList();
         if (paths.Count == 0)
         {
             e.Cancel = true;
@@ -1169,7 +1419,7 @@ public sealed partial class FilePane : UserControl
             return;
         }
 
-        bool copy = e.Modifiers.HasFlag(DragDropModifiers.Control) || IsInArchive;
+        bool copy = e.Modifiers.HasFlag(DragDropModifiers.Control) || IsInArchive || IsRemote;
         e.AcceptedOperation = copy ? DataPackageOperation.Copy : DataPackageOperation.Move;
         var folderName = Path.GetFileName(CurrentPath.TrimEnd('\\'));
         if (folderName.Length == 0) folderName = CurrentPath;
@@ -1187,7 +1437,7 @@ public sealed partial class FilePane : UserControl
         DropHint.Visibility = Visibility.Collapsed;
         if (Host is null || IsDriveList) return;
 
-        bool copy = e.Modifiers.HasFlag(DragDropModifiers.Control) || IsInArchive;
+        bool copy = e.Modifiers.HasFlag(DragDropModifiers.Control) || IsInArchive || IsRemote;
         var deferral = e.GetDeferral();
         List<string> paths;
         try
@@ -1221,7 +1471,7 @@ public sealed partial class FilePane : UserControl
     {
         var settings = AppSettings.Current;
         if (!settings.HoverPreview) return;
-        if ((sender as FrameworkElement)?.DataContext is not FileItem { IsEntry: true, IsInArchive: false } item) return;
+        if ((sender as FrameworkElement)?.DataContext is not FileItem { IsEntry: true, IsVirtual: false, IsOnlineOnly: false } item) return;
         if (!FileKinds.SupportsHover(item.Kind)) return;
 
         _hoverItem = item;

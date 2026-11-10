@@ -12,6 +12,7 @@ using Windows.UI.Core;
 using ZeroFileCommander.Controls;
 using ZeroFileCommander.Models;
 using ZeroFileCommander.Services;
+using ZeroFileCommander.Services.Connections;
 using ZeroFileCommander.Views;
 
 namespace ZeroFileCommander;
@@ -112,10 +113,13 @@ public sealed partial class MainWindow : Window, IPaneHost
             TransferManager.Current.ConflictsWaiting += Transfer_ConflictsWaiting;
         }
         TransferManager.Current.ProgressChanged += Transfer_ProgressChanged;
+        ConnectionStore.Changed += ConnectionStore_Changed;
+        BuildConnectionsMenu();
         TransferManager.Current.JobFinished += Transfer_JobFinishedRefresh;
         Closed += (_, _) =>
         {
             TransferManager.Current.ProgressChanged -= Transfer_ProgressChanged;
+            ConnectionStore.Changed -= ConnectionStore_Changed;
             TransferManager.Current.JobFinished -= Transfer_JobFinishedRefresh;
             _settings.Changed -= Settings_Changed;
             Clipboard.ContentChanged -= Clipboard_ContentChanged;
@@ -217,8 +221,25 @@ public sealed partial class MainWindow : Window, IPaneHost
     }
 
     /// <summary>Arşiv içindeki dosyayı önizleme için geçici klasöre çıkarır.</summary>
-    private static async Task<FileItem?> ResolvePreviewItemAsync(FileItem item)
+    private static async Task<FileItem?> ResolvePreviewItemAsync(FileItem item, bool explicitRequest = false)
     {
+        if (item.IsRemote && !item.IsDirectory)
+        {
+            // Seçim gezinirken yavaş bağlantıda büyük dosya indirilmesin; F3 ile istenirse 64 MB'a kadar.
+            long limit = explicitRequest ? 64L * 1024 * 1024 : 4L * 1024 * 1024;
+            if ((item.Size ?? 0) > limit || ConnectionStore.Find(item.RemoteId!) is not { } connection) return null;
+            try
+            {
+                var temp = await RemoteFiles.DownloadToTempAsync(connection, item.RemotePath!, item.Name, CancellationToken.None);
+                return new FileItem { Name = item.Name, FullPath = temp, Size = item.Size, Modified = item.Modified };
+            }
+            catch (Exception ex)
+            {
+                CrashLog.Write("Uzak önizleme", ex);
+                return null;
+            }
+        }
+        if (item.IsRemote) return null; // uzak klasörün içeriği önizlenmez
         if (!item.IsInArchive || item.IsDirectory) return item;
         if ((item.Size ?? 0) > 64L * 1024 * 1024) return null;
         try
@@ -337,6 +358,10 @@ public sealed partial class MainWindow : Window, IPaneHost
         var selection = pane.SelectedItems;
         var focus = pane.FocusedItem is { IsEntry: true } f ? f : null;
         var target = focus ?? selection.FirstOrDefault();
+
+        if ((pane.IsRemote || (command is PaneCommand.CopyToOther or PaneCommand.MoveToOther && Other.IsRemote)) &&
+            await ExecuteRemoteAsync(command, pane, selection, target))
+            return;
 
         if (pane.IsInArchive && command is PaneCommand.Rename or PaneCommand.NewFolder or PaneCommand.Cut
                 or PaneCommand.OpenTerminal or PaneCommand.RunAsAdmin or PaneCommand.MoveToOther or PaneCommand.Compress)
@@ -501,6 +526,8 @@ public sealed partial class MainWindow : Window, IPaneHost
             case "app:newwindow": OpenNewWindow(); break;
             case "app:sendtowindow": await SendToOtherWindowAsync(); break;
             case "app:shelf": ShelfWindow.Toggle(); break;
+            case "app:newconnection": await NewConnectionAsync(); break;
+            case "app:connections": await ManageConnectionsAsync(); break;
             case "app:batchrename": await BatchRenameAsync(_active); break;
             case "app:undorename": await UndoRenameAsync(); break;
             case "app:search": OpenSearch(); break;
@@ -544,6 +571,12 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (string.Equals(source.CurrentPath, target.CurrentPath, StringComparison.OrdinalIgnoreCase))
         {
             await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Aynı klasör", "İki panel aynı klasörü gösteriyor.");
+            return;
+        }
+
+        if (source.IsRemote || target.IsRemote)
+        {
+            await RemoteTransferAsync(source, target, items, move);
             return;
         }
 
@@ -652,6 +685,13 @@ public sealed partial class MainWindow : Window, IPaneHost
     {
         if (target.IsDriveList || paths.Count == 0) return;
 
+        if (target.IsRemote)
+        {
+            SetActive(target);
+            await UploadAsync(target, paths, move: false);
+            return;
+        }
+
         if (target.IsInArchive)
         {
             SetActive(target);
@@ -680,6 +720,13 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (pane.IsDriveList) return;
         var files = await ClipboardService.GetFilesAsync();
         if (files is null) return;
+
+        if (pane.IsRemote)
+        {
+            await UploadAsync(pane, files.Paths, files.IsCut);
+            if (files.IsCut) ClipboardService.Clear();
+            return;
+        }
 
         if (pane.IsInArchive)
         {
@@ -767,7 +814,7 @@ public sealed partial class MainWindow : Window, IPaneHost
     private async Task ShowPreviewPaneAsync(FileItem item, bool autoPlay)
     {
         if (!_settings.ShowPreviewPane) _settings.ShowPreviewPane = true;
-        await Preview.ShowAsync(await ResolvePreviewItemAsync(item), autoPlay);
+        await Preview.ShowAsync(await ResolvePreviewItemAsync(item, explicitRequest: true), autoPlay);
     }
 
     // ================================================================ Şerit
@@ -1242,6 +1289,8 @@ public sealed partial class MainWindow : Window, IPaneHost
         ("app:newwindow", "Yeni pencere", "\uE78B", "Ctrl+N"),
         ("app:sendtowindow", "Diğer pencereye kopyala", "\uE8A7", "Ctrl+Shift+→"),
         ("app:shelf", "Rafı aç/kapat", "\uE7B8", "Ctrl+Shift+S"),
+        ("app:newconnection", "Yeni bağlantı (NAS, SFTP, FTP)", "\uE968", ""),
+        ("app:connections", "Bağlantıları yönet", "\uE713", ""),
         ("AddToShelf", "Rafa ekle", "\uE7B8", ""),
         ("app:settings", "Ayarlar", "\uE713", "Ctrl+,"),
         ("app:resetlayout", "Panel yerleşimini sıfırla", "\uE7A7", ""),
@@ -1522,6 +1571,315 @@ public sealed partial class MainWindow : Window, IPaneHost
         _active.ShowStatus($"{selection.Count} öğe diğer pencereye gönderildi → {target.CurrentPath}");
     }
 
+    // ================================================================ Faz 5: bağlantılar
+
+    private void ConnectionStore_Changed(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(BuildConnectionsMenu);
+
+    private void BuildConnectionsMenu()
+    {
+        ConnectionsMenu.Items.Clear();
+        var add = new MenuFlyoutItem { Text = "Yeni bağlantı…", Icon = new FontIcon { Glyph = "\uE710" } };
+        add.Click += async (_, _) => await NewConnectionAsync();
+        ConnectionsMenu.Items.Add(add);
+        var manage = new MenuFlyoutItem { Text = "Bağlantıları yönet…", Icon = new FontIcon { Glyph = "\uE713" } };
+        manage.Click += async (_, _) => await ManageConnectionsAsync();
+        ConnectionsMenu.Items.Add(manage);
+
+        var connections = ConnectionStore.All.OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        if (connections.Count > 0) ConnectionsMenu.Items.Add(new MenuFlyoutSeparator());
+        foreach (var connection in connections)
+        {
+            var item = new MenuFlyoutItem { Text = connection.Name, Icon = new FontIcon { Glyph = connection.Glyph } };
+            ToolTipService.SetToolTip(item, connection.Kind == ConnectionKind.Smb ? connection.UncPath : connection.RootUri);
+            item.Click += (_, _) => OpenConnection(connection);
+            ConnectionsMenu.Items.Add(item);
+        }
+
+        var clouds = CloudFolders.Get();
+        if (clouds.Count > 0)
+        {
+            ConnectionsMenu.Items.Add(new MenuFlyoutSeparator());
+            foreach (var cloud in clouds)
+            {
+                var item = new MenuFlyoutItem { Text = cloud.Name, Icon = new FontIcon { Glyph = "\uE753" } };
+                item.Click += (_, _) => { _active.Navigate(cloud.Path); _active.FocusList(); };
+                ConnectionsMenu.Items.Add(item);
+            }
+        }
+
+        ConnectionsMenu.Items.Add(new MenuFlyoutSeparator());
+        var disconnect = new MenuFlyoutItem { Text = "Tüm uzak oturumları kapat", Icon = new FontIcon { Glyph = "\uE8CD" } };
+        disconnect.Click += (_, _) =>
+        {
+            RemoteSessions.CloseAll();
+            foreach (var pane in new[] { LeftPane, RightPane }.Where(p => p.IsRemote)) pane.Navigate(string.Empty);
+        };
+        ConnectionsMenu.Items.Add(disconnect);
+    }
+
+    private void OpenConnection(SavedConnection connection)
+    {
+        string target = connection.Kind == ConnectionKind.Smb ? connection.UncPath
+            : connection.Path.Trim().Length > 0 ? RemotePath.ToUri(connection, connection.Path) : connection.RootUri;
+        _active.Navigate(target);
+        _active.FocusList();
+    }
+
+    private async Task NewConnectionAsync(SavedConnection? existing = null, bool open = true)
+    {
+        var result = await ConnectionDialogs.EditAsync(Content.XamlRoot, DialogTheme, Hwnd, existing);
+        if (result is null) return;
+        ConnectionStore.Save(result.Connection);
+        if (result.PasswordChanged || existing is null || !result.SavePassword != !ConnectionStore.IsPasswordPersisted(result.Connection))
+            ConnectionStore.SetPassword(result.Connection, result.Password, result.SavePassword);
+        RemoteSessions.Close(result.Connection.Id); // ayarlar değişti: yeni oturum açılsın
+        if (open) OpenConnection(result.Connection);
+    }
+
+    private async Task ManageConnectionsAsync()
+    {
+        while (true)
+        {
+            var (action, connection) = await ConnectionDialogs.ManageAsync(Content.XamlRoot, DialogTheme);
+            switch (action)
+            {
+                case ConnectionDialogs.ManageAction.New:
+                    await NewConnectionAsync();
+                    return;
+                case ConnectionDialogs.ManageAction.Open when connection is not null:
+                    OpenConnection(connection);
+                    return;
+                case ConnectionDialogs.ManageAction.Edit when connection is not null:
+                    await NewConnectionAsync(connection, open: false);
+                    continue; // listeye dön
+                case ConnectionDialogs.ManageAction.Delete when connection is not null:
+                    if (await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, $"\"{connection.Name}\" silinsin mi?",
+                            "Bağlantı ve kayıtlı parolası silinir. Sunucudaki dosyalara dokunulmaz.", "Sil"))
+                    {
+                        RemoteSessions.Close(connection.Id);
+                        ConnectionStore.Remove(connection);
+                    }
+                    continue;
+                default:
+                    return;
+            }
+        }
+    }
+
+    /// <summary>Oturum aç; sunucu anahtarı ve parola sorularını sırayla çöz. Vazgeçilirse null.</summary>
+    private readonly SemaphoreSlim _connectGate = new(1, 1);
+
+    public async Task<IRemoteSession?> ConnectRemoteAsync(SavedConnection connection)
+    {
+        // İki panel aynı anda bağlanırsa diyaloglar üst üste açılmasın.
+        await _connectGate.WaitAsync();
+        try
+        {
+            return await ConnectRemoteCoreAsync(connection);
+        }
+        finally
+        {
+            _connectGate.Release();
+        }
+    }
+
+    private async Task<IRemoteSession?> ConnectRemoteCoreAsync(SavedConnection connection)
+    {
+        for (int attempt = 0; attempt < 4; attempt++)
+        {
+            try
+            {
+                // Parola hiç yoksa ve anahtar dosyası da yoksa önce sor.
+                if (connection.Kind == ConnectionKind.Sftp && string.IsNullOrEmpty(connection.KeyFile) &&
+                    ConnectionStore.GetPassword(connection) is null)
+                {
+                    var asked = await ConnectionDialogs.PasswordAsync(Content.XamlRoot, DialogTheme, connection, $"{connection.Host} için parola girin.");
+                    if (asked is null) return null;
+                    ConnectionStore.SetPassword(connection, asked.Value.Password, asked.Value.Save);
+                }
+                return await RemoteSessions.GetAsync(connection);
+            }
+            catch (RemoteHostKeyException key)
+            {
+                if (!await ConnectionDialogs.TrustHostKeyAsync(Content.XamlRoot, DialogTheme, connection, key)) return null;
+                connection.HostKey = key.Fingerprint;
+                ConnectionStore.Save(connection);
+            }
+            catch (RemoteAuthException auth)
+            {
+                var asked = await ConnectionDialogs.PasswordAsync(Content.XamlRoot, DialogTheme, connection, auth.Message);
+                if (asked is null) return null;
+                ConnectionStore.SetPassword(connection, asked.Value.Password, asked.Value.Save);
+            }
+            catch (Exception ex)
+            {
+                CrashLog.Write("Uzak bağlantı", ex);
+                await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, $"{connection.Name} bağlantısı kurulamadı", ex.Message);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static readonly PaneCommand[] RemoteUnsupported =
+    {
+        PaneCommand.Cut, PaneCommand.Copy, PaneCommand.Compress, PaneCommand.ExtractHere, PaneCommand.ExtractToOther,
+        PaneCommand.OpenTerminal, PaneCommand.RunAsAdmin, PaneCommand.ShowInExplorer, PaneCommand.AddToShelf, PaneCommand.SendToWindow,
+    };
+
+    /// <summary>Uzak panelde komutlar. true: işlendi; false: genel akış sürsün (aç, önizle, yenile, yol kopyala).</summary>
+    private async Task<bool> ExecuteRemoteAsync(PaneCommand command, FilePane pane, IReadOnlyList<FileItem> selection, FileItem? target)
+    {
+        if (command is PaneCommand.CopyToOther or PaneCommand.MoveToOther)
+        {
+            await TransferAsync(pane, selection, command == PaneCommand.MoveToOther);
+            return true;
+        }
+        if (!pane.IsRemote || pane.Remote is not { } connection) return false;
+        if (RemoteUnsupported.Contains(command))
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Uzak bağlantıda yapılamıyor",
+                "Bu işlem sunucudaki dosyalarda desteklenmiyor. Dosyaları önce karşı panele indirin (F5).");
+            return true;
+        }
+
+        try
+        {
+            switch (command)
+            {
+                case PaneCommand.OpenWith when target is { IsDirectory: false, RemotePath: not null }:
+                    ShellActions.OpenWith(await RemoteFiles.DownloadToTempAsync(connection, target.RemotePath, target.Name, CancellationToken.None));
+                    return true;
+                case PaneCommand.Edit when target is { IsDirectory: false, RemotePath: not null }:
+                    ShellActions.EditInNotepad(await RemoteFiles.DownloadToTempAsync(connection, target.RemotePath, target.Name, CancellationToken.None));
+                    pane.ShowStatus("Salt okunur yerel kopya açıldı; değişiklikler sunucuya gönderilmez.");
+                    return true;
+                case PaneCommand.Rename when target is { RemotePath: not null }:
+                {
+                    var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "Yeniden adlandır", target.Name, "Adlandır", selectStem: !target.IsDirectory);
+                    if (name is null || name == target.Name) return true;
+                    if (name.Contains('/'))
+                    {
+                        await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Geçersiz ad", "Ad \"/\" içeremez.");
+                        return true;
+                    }
+                    var session = await ConnectRemoteAsync(connection);
+                    if (session is null) return true;
+                    await session.RenameAsync(target.RemotePath, RemotePath.Combine(pane.RemoteDir, name), CancellationToken.None);
+                    pane.Refresh();
+                    pane.SelectByName(name);
+                    return true;
+                }
+                case PaneCommand.NewFolder:
+                {
+                    var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "Yeni klasör", "Yeni klasör", "Oluştur");
+                    if (name is null) return true;
+                    var session = await ConnectRemoteAsync(connection);
+                    if (session is null) return true;
+                    await session.CreateDirectoryAsync(RemotePath.Combine(pane.RemoteDir, name), CancellationToken.None);
+                    pane.Refresh();
+                    pane.SelectByName(name);
+                    return true;
+                }
+                case PaneCommand.Delete when selection.Count > 0:
+                {
+                    var subject = selection.Count == 1 ? $"\"{selection[0].Name}\"" : $"{selection.Count} öğe";
+                    if (!await Dialogs.ConfirmDangerAsync(Content.XamlRoot, DialogTheme, $"{subject} sunucudan silinsin mi?",
+                            "Sunucudaki dosyalar Geri Dönüşüm Kutusu'na gitmez; silinen klasörler içerikleriyle birlikte kalıcı olarak kaldırılır.",
+                            "Kalıcı olarak sil")) return true;
+                    var session = await ConnectRemoteAsync(connection);
+                    if (session is null) return true;
+                    int done = 0;
+                    var errors = new List<string>();
+                    foreach (var item in selection.Where(i => i.RemotePath is not null))
+                    {
+                        pane.ShowStatus($"Siliniyor: {item.Name}");
+                        try
+                        {
+                            await session.DeleteAsync(item.RemotePath!, item.IsDirectory, CancellationToken.None);
+                            done++;
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException or Renci.SshNet.Common.SshException or FluentFTP.Exceptions.FtpException)
+                        {
+                            errors.Add($"{item.Name}: {ex.Message}");
+                        }
+                    }
+                    pane.Refresh();
+                    if (errors.Count > 0)
+                        await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, $"{done} öğe silindi, {errors.Count} hata", string.Join("\n", errors.Take(10)));
+                    return true;
+                }
+                case PaneCommand.Paste:
+                    await PasteAsync(pane);
+                    return true;
+                case PaneCommand.Properties:
+                {
+                    var subject = target;
+                    string text = subject is null
+                        ? $"{connection.KindLabel} · {connection.Host}:{connection.EffectivePort}\nKlasör: {pane.RemoteDir}\nKullanıcı: {(connection.User.Length > 0 ? connection.User : "—")}"
+                        : $"{(subject.IsDirectory ? "Klasör" : subject.SizeText)}\nDeğiştirilme: {subject.ModifiedText}\nYol: {subject.RemotePath}\nSunucu: {connection.Name} ({connection.KindLabel})";
+                    await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, subject?.Name ?? connection.Name, text);
+                    return true;
+                }
+                default:
+                    return false;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            CrashLog.Write("Uzak işlem", ex);
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "İşlem tamamlanamadı", ex.Message);
+            return true;
+        }
+    }
+
+    /// <summary>Paneller arası uzak aktarım: indirme ya da yükleme; her zaman aktarım kuyruğundan.</summary>
+    private async Task RemoteTransferAsync(FilePane source, FilePane target, IReadOnlyList<FileItem> items, bool move)
+    {
+        if (source.IsRemote && target.IsRemote)
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Desteklenmiyor",
+                "İki sunucu arasında doğrudan aktarım yapılamıyor. Önce yerel bir klasöre indirin.");
+            return;
+        }
+        if (source.IsInArchive || target.IsInArchive)
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Desteklenmiyor",
+                "Arşiv ile sunucu arasında doğrudan aktarım yapılamıyor. Önce bir klasöre çıkarın.");
+            return;
+        }
+        if (target.IsDriveList)
+        {
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Hedef seçilmedi", "Karşı panelde bir klasör açın.");
+            return;
+        }
+
+        if (source.IsRemote)
+        {
+            if (await ConnectRemoteAsync(source.Remote!) is null) return; // anahtar/parola burada onaylansın
+            var uris = items.Where(i => i.IsRemote).Select(i => i.FullPath).ToList();
+            if (uris.Count == 0) return;
+            TransferManager.Current.EnqueueRemote(move ? TransferKind.Move : TransferKind.Copy, uris, target.CurrentPath,
+                _settings.DefaultConflictPolicy, source.Remote, null);
+            source.ShowStatus($"{uris.Count} öğe indirme kuyruğunda");
+        }
+        else
+        {
+            await UploadAsync(target, items.Select(i => i.FullPath).ToList(), move);
+        }
+    }
+
+    private async Task UploadAsync(FilePane target, IReadOnlyList<string> paths, bool move)
+    {
+        if (target.Remote is not { } connection || paths.Count == 0) return;
+        if (await ConnectRemoteAsync(connection) is null) return;
+        var local = paths.Where(p => !RemotePath.LooksRemote(p) && (File.Exists(p) || Directory.Exists(p))).ToList();
+        if (local.Count == 0) return;
+        TransferManager.Current.EnqueueRemote(move ? TransferKind.Move : TransferKind.Copy, local,
+            RemotePath.ToUri(connection, target.RemoteDir), _settings.DefaultConflictPolicy, null, connection);
+        target.ShowStatus($"{local.Count} öğe yükleme kuyruğunda");
+    }
+
     // ================================================================ Yerleşim
 
     private void ResizePanes(double dx)
@@ -1709,6 +2067,8 @@ public sealed partial class MainWindow : Window, IPaneHost
         SaveSession();
         Clipboard.ContentChanged -= Clipboard_ContentChanged;
         _taskbar.Set(null);
+        RemoteSessions.CloseAll();
+        RemoteFiles.CleanTemp();
         _tray?.Dispose();
         Preview.Stop();
         _downloadsWindow?.Close();

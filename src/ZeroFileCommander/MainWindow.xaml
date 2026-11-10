@@ -182,6 +182,7 @@
                 </MenuFlyoutSubItem>
             </MenuBarItem>
 
+            <MenuBarItem x:Name="ConnectionsMenu" Title="Bağlantılar" />
             <MenuBarItem Title="Pencere">
                 <MenuFlyoutItem Text="Komut paleti" Tag="app:palette" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+K">
                     <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE756;" /></MenuFlyoutItem.Icon>

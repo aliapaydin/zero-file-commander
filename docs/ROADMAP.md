@@ -63,10 +63,10 @@ Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor
 - [x] Power BI meta bilgileri: PBIX/PBIT sayfaları, görseller, bağlantılar, Power Query; PBIP/TMSL/TMDL tabloları, ölçüler (DAX), ilişkiler
 - [x] Git durumu: dal adı, ileri/geri, satırlarda M/A/D/U işaretleri, yok sayılanlar sönük
 
-## Faz 5 · v0.8: Bağlantılar
-- [ ] Kayıtlı ağ/NAS bağlantıları
-- [ ] SFTP / FTP
-- [ ] Bulut klasörleri
+## Faz 5 · v0.8: Bağlantılar ✅
+- [x] Kayıtlı ağ/NAS bağlantıları (SMB, kimlik bilgisiyle; ulaşılamayan sunucu arayüzü dondurmaz)
+- [x] SFTP / FTPS / FTP: gezinme, indirme/yükleme kuyrukta, yeniden adlandırma, klasör, silme; parolalar Windows Kimlik Bilgisi Kasası'nda, SFTP sunucu anahtarı ilk bağlantıda onaylanır
+- [x] Bulut klasörleri (OneDrive, Google Drive, Dropbox, iCloud, Box): "Bu bilgisayar"da; yalnızca çevrimiçi dosyalar işaretli ve önizleme onları kendiliğinden indirmez
 
 ## Bekleyenler
 - [ ] Önizle ve düzenle ekranı: sözdizimi renklendirme, kaydetme

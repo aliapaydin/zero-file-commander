@@ -22,6 +22,9 @@ public static class ShellIcons
     public static ImageSource? Get(FileItem item)
     {
         if (item.IsParent) return null;
+        // Uzak bağlantılar ve ağ konumları için kabuğa sorma (ulaşılamazsa uzun süre bekletir).
+        if (item.IsDrive && (item.FullPath.Contains("://", StringComparison.Ordinal) || item.FullPath.StartsWith(@"\\", StringComparison.Ordinal)))
+            return null;
 
         string key, path;
         uint attributes = 0;
@@ -42,7 +45,7 @@ public static class ShellIcons
         else
         {
             var ext = Path.GetExtension(item.Name);
-            if (PerFile.Contains(ext) && !item.IsInArchive)
+            if (PerFile.Contains(ext) && !item.IsInArchive && !item.IsRemote)
             {
                 key = item.FullPath;
                 path = item.FullPath;

@@ -65,6 +65,14 @@ public sealed class TransferJob : INotifyPropertyChanged
     public ConflictPolicy Policy { get; set; }
     public DateTime Created { get; } = DateTime.Now;
 
+    /// <summary>Kaynaklar bu uzak bağlantıdaysa (indirme). Kaynaklar o zaman uzak adreslerdir.</summary>
+    public Connections.SavedConnection? SourceConnection { get; init; }
+
+    /// <summary>Hedef bu uzak bağlantıdaysa (yükleme). Hedef o zaman uzak adrestir.</summary>
+    public Connections.SavedConnection? TargetConnection { get; init; }
+
+    public bool IsRemote => SourceConnection is not null || TargetConnection is not null;
+
     internal List<(string Source, string Destination, long Size)> PendingConflicts { get; } = new();
     internal List<string> Errors { get; } = new();
     internal ManualResetEventSlim Gate { get; } = new(true);
@@ -76,7 +84,9 @@ public sealed class TransferJob : INotifyPropertyChanged
         get
         {
             string what = Sources.Count == 1 ? Path.GetFileName(Sources[0].TrimEnd('\\')) : $"{Sources.Count} öğe";
-            string verb = Kind == TransferKind.Copy ? "Kopyalanıyor" : "Taşınıyor";
+            string verb = SourceConnection is not null ? (Kind == TransferKind.Copy ? "İndiriliyor" : "İndirilip taşınıyor")
+                : TargetConnection is not null ? (Kind == TransferKind.Copy ? "Yükleniyor" : "Yüklenip taşınıyor")
+                : Kind == TransferKind.Copy ? "Kopyalanıyor" : "Taşınıyor";
             return $"{verb}: {what}";
         }
     }
@@ -151,7 +161,7 @@ public sealed class TransferJob : INotifyPropertyChanged
 /// Çakışmalar kuyruğu durdurmaz; "sonra sor" kuralında çakışanlar sona bırakılır.
 /// Yarım dosya bırakmamak için önce geçici ada kopyalar, bitince yerine koyar.
 /// </summary>
-public sealed class TransferManager
+public sealed partial class TransferManager
 {
     public static TransferManager Current { get; } = new();
 
@@ -189,9 +199,16 @@ public sealed class TransferManager
         }
     }
 
-    public TransferJob Enqueue(TransferKind kind, IReadOnlyList<string> sources, string target, ConflictPolicy policy)
+    public TransferJob Enqueue(TransferKind kind, IReadOnlyList<string> sources, string target, ConflictPolicy policy) =>
+        Enqueue(new TransferJob(kind, sources, target, policy));
+
+    /// <summary>Uzak bağlantıya yükleme ya da oradan indirme işi ekler.</summary>
+    public TransferJob EnqueueRemote(TransferKind kind, IReadOnlyList<string> sources, string target, ConflictPolicy policy,
+        Connections.SavedConnection? source, Connections.SavedConnection? destination) =>
+        Enqueue(new TransferJob(kind, sources, target, policy) { SourceConnection = source, TargetConnection = destination });
+
+    private TransferJob Enqueue(TransferJob job)
     {
-        var job = new TransferJob(kind, sources, target, policy);
         Jobs.Insert(0, job);
         RaiseProgress();
         if (!_running) _ = RunQueueAsync();
@@ -263,6 +280,11 @@ public sealed class TransferManager
 
     private async Task RunJobAsync(TransferJob job)
     {
+        if (job.IsRemote)
+        {
+            await RunRemoteJobAsync(job);
+            return;
+        }
         var token = job.Cancellation.Token;
         job.State = TransferState.Scanning;
         RaiseProgress();

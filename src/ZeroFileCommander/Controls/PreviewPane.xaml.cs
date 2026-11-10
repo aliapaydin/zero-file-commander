@@ -67,6 +67,15 @@ public sealed partial class PreviewPane : UserControl
         DateText.Text = item.ModifiedText;
         ExtraText.Text = string.Empty;
 
+        // Yalnızca çevrimiçi bulut dosyası: seçmek dosyayı indirmesin, kullanıcı istesin.
+        if (item.IsOnlineOnly && !string.Equals(_hydrateAllowed, item.FullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            ShowPlaceholder("\uE753", "Bu dosya yalnızca bulutta. Önizlemek onu bu bilgisayara indirir.");
+            PlaceholderAction.Content = "İndir ve önizle";
+            PlaceholderAction.Visibility = Visibility.Visible;
+            return;
+        }
+
         LoadingRing.IsActive = true;
         try
         {
@@ -721,8 +730,19 @@ public sealed partial class PreviewPane : UserControl
         return expander;
     }
 
+    private string? _hydrateAllowed;
+
+    private async void PlaceholderAction_Click(object sender, RoutedEventArgs e)
+    {
+        if (_current is not { } item) return;
+        _hydrateAllowed = item.FullPath;
+        _current = null; // aynı öğeyi yeniden göstermeye izin ver
+        await ShowAsync(item);
+    }
+
     private void ShowPlaceholder(string glyph, string text)
     {
+        PlaceholderAction.Visibility = Visibility.Collapsed;
         PlaceholderIcon.Glyph = glyph;
         PlaceholderText.Text = text;
         Placeholder.Visibility = Visibility.Visible;

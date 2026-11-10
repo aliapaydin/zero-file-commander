@@ -27,6 +27,29 @@ public sealed class FileItem : INotifyPropertyChanged
 
     public bool IsInArchive => ArchivePath is not null;
 
+    /// <summary>Uzak bağlantıdaki öğe için kayıtlı bağlantının kimliği.</summary>
+    public string? RemoteId { get; set; }
+
+    /// <summary>Sunucudaki yol ("/a/b"); FullPath ise panelde görünen tam adrestir.</summary>
+    public string? RemotePath { get; set; }
+
+    public bool IsRemote => RemoteId is not null;
+
+    /// <summary>Arşiv ya da uzak bağlantı: dosya sisteminde doğrudan yok.</summary>
+    public bool IsVirtual => IsInArchive || IsRemote;
+
+    /// <summary>Sürücü listesindeki bulut/ağ konumları için özel simge.</summary>
+    public string? GlyphOverride { get; set; }
+
+    /// <summary>Bulut yer tutucusu: içerik yalnızca çevrimiçi, açılınca indirilir.</summary>
+    public bool IsOnlineOnly { get; set; }
+
+    /// <summary>Bulut dosyası "her zaman bu cihazda tut" olarak işaretli.</summary>
+    public bool IsPinned { get; set; }
+
+    /// <summary>Ad yanındaki bulut işareti.</summary>
+    public string CloudGlyph => IsOnlineOnly ? "\uE753" : IsPinned ? "\uE73E" : string.Empty;
+
     /// <summary>Gerçek bir dosya ya da klasör mü ("..", sürücü değil).</summary>
     public bool IsEntry => !IsParent && !IsDrive;
 
@@ -49,7 +72,7 @@ public sealed class FileItem : INotifyPropertyChanged
     // Segoe Fluent Icons (gerçek simge yüklenene kadar ya da ".." için)
     public string Glyph =>
         IsParent ? "" :
-        IsDrive ? "" :
+        IsDrive ? GlyphOverride ?? "" :
         FileKinds.Glyph(Kind);
 
     /// <summary>Windows'un bu dosya türü için kullandığı simge (gecikmeli yüklenir).</summary>

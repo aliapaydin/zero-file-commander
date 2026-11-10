@@ -12,7 +12,7 @@
   <Identity
     Name="ZeroFileCommander"
     Publisher="CN=ZeroFileCommander-Dev"
-    Version="0.7.0.0" />
+    Version="0.8.0.0" />
 
   <Properties>
     <DisplayName>Zero File Commander</DisplayName>

@@ -120,6 +120,9 @@ public static class ConnectionStore
 
     private static List<SavedConnection>? _all;
 
+    /// <summary>"Parolayı kaydet" seçilmediyse parola yalnızca uygulama açıkken bellekte durur.</summary>
+    private static readonly Dictionary<string, string> SessionPasswords = new();
+
     public static event EventHandler? Changed;
 
     private static string FilePath
@@ -176,6 +179,8 @@ public static class ConnectionStore
 
     public static string? GetPassword(SavedConnection connection)
     {
+        lock (SessionPasswords)
+            if (SessionPasswords.TryGetValue(connection.Id, out var remembered)) return remembered;
         try
         {
             var credential = new PasswordVault().Retrieve(VaultResource, connection.Id);
@@ -188,9 +193,28 @@ public static class ConnectionStore
         }
     }
 
-    /// <summary>Parolayı kasaya yazar; null ya da boşsa siler.</summary>
-    public static void SetPassword(SavedConnection connection, string? password)
+    public static bool IsPasswordPersisted(SavedConnection connection)
     {
+        try
+        {
+            new PasswordVault().Retrieve(VaultResource, connection.Id);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Parolayı kasaya yazar; null ya da boşsa siler.</summary>
+    public static void SetPassword(SavedConnection connection, string? password, bool persist = true)
+    {
+        lock (SessionPasswords)
+        {
+            SessionPasswords.Remove(connection.Id);
+            if (!persist && !string.IsNullOrEmpty(password)) SessionPasswords[connection.Id] = password;
+        }
+        if (!persist) password = null; // kasadan da kaldır
         var vault = new PasswordVault();
         try
         {
