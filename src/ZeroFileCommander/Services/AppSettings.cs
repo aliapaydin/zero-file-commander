@@ -36,6 +36,7 @@ public sealed class AppSettings
     public bool ShowPreviewPane { get => Get(true); set => Set(value); }
     public bool ShowFolderTree { get => Get(false); set => Set(value); }
     public bool ShowRibbon { get => Get(true); set => Set(value); }
+    public bool ShowDriveBar { get => Get(true); set => Set(value); }
     public bool HoverPreview { get => Get(true); set => Set(value); }
     public int HoverDelayMs { get => Get(350); set => Set(value); }
 

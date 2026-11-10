@@ -12,7 +12,7 @@
 
     <Grid
         x:Name="RootGrid"
-        RowDefinitions="36,Auto,Auto,*,Auto"
+        RowDefinitions="36,Auto,Auto,Auto,*,Auto"
         PreviewKeyDown="RootGrid_PreviewKeyDown"
         ActualThemeChanged="RootGrid_ActualThemeChanged">
         <Grid.KeyboardAccelerators>
@@ -129,6 +129,7 @@
             </MenuBarItem>
 
             <MenuBarItem Title="Görünüm">
+                <ToggleMenuFlyoutItem x:Name="MenuShowDrives" Text="Sürücü çubuğu" Tag="app:drives" Click="Command_Click" />
                 <ToggleMenuFlyoutItem x:Name="MenuShowRibbon" Text="Şerit" Tag="app:ribbon" Click="Command_Click" />
                 <ToggleMenuFlyoutItem x:Name="MenuShowTree" Text="Klasör ağacı" Tag="app:tree" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+E" />
                 <ToggleMenuFlyoutItem x:Name="MenuShowPreview" Text="Önizleme paneli" Tag="app:preview" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+Q" />
@@ -177,8 +178,20 @@
             </MenuBarItem>
         </MenuBar>
 
+        <!-- Sürücü çubuğu -->
+        <ScrollViewer
+            x:Name="DriveBar"
+            Grid.Row="2"
+            Padding="10,2,10,8"
+            HorizontalScrollMode="Auto"
+            HorizontalScrollBarVisibility="Auto"
+            VerticalScrollMode="Disabled"
+            VerticalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="DrivePanel" Orientation="Horizontal" Spacing="8" />
+        </ScrollViewer>
+
         <!-- Bağlamsal şerit -->
-        <Grid x:Name="RibbonArea" Grid.Row="2" Padding="8,0,8,6" ColumnSpacing="8" ColumnDefinitions="Auto,*">
+        <Grid x:Name="RibbonArea" Grid.Row="3" Padding="8,0,8,6" ColumnSpacing="8" ColumnDefinitions="Auto,*">
             <Border
                 x:Name="ContextTag"
                 Padding="10,4"
@@ -253,7 +266,7 @@
         </Grid>
 
         <!-- İçerik: klasör ağacı | sol panel | sağ panel | önizleme (aralarında sürüklenebilir ayırıcılar) -->
-        <Grid x:Name="ContentGrid" Grid.Row="3" Padding="10,0,10,8">
+        <Grid x:Name="ContentGrid" Grid.Row="4" Padding="10,0,10,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="TreeColumn" Width="0" />
                 <ColumnDefinition x:Name="TreeSplitColumn" Width="0" />
@@ -290,7 +303,7 @@
 
         <!-- Alt çubuk: fonksiyon tuşları + indirme takibi -->
         <Grid
-            Grid.Row="4"
+            Grid.Row="5"
             Padding="10,6,10,10"
             ColumnSpacing="12"
             ColumnDefinitions="*,Auto,Auto"

@@ -35,16 +35,16 @@
                 Grid.Row="1"
                 CornerRadius="8"
                 Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                <!-- Görseller ve PDF sayfaları: panel genişliğine sığar, aşağı kaydırılır -->
                 <ScrollViewer
                     x:Name="ImageScroller"
                     Visibility="Collapsed"
-                    ZoomMode="Enabled"
-                    MinZoomFactor="1"
-                    MaxZoomFactor="6"
-                    HorizontalScrollBarVisibility="Auto"
-                    HorizontalScrollMode="Auto"
-                    PointerWheelChanged="ImageScroller_PointerWheelChanged">
-                    <Image x:Name="PreviewImage" Stretch="Uniform" Margin="6" />
+                    HorizontalScrollMode="Disabled"
+                    HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Auto"
+                    ViewChanged="ImageScroller_ViewChanged"
+                    SizeChanged="ImageScroller_SizeChanged">
+                    <StackPanel x:Name="PageStack" Padding="6" Spacing="8" />
                 </ScrollViewer>
                 <MediaPlayerElement
                     x:Name="Player"
@@ -54,13 +54,14 @@
                 <ScrollViewer
                     x:Name="TextScroller"
                     Visibility="Collapsed"
-                    HorizontalScrollBarVisibility="Auto"
-                    HorizontalScrollMode="Auto">
+                    HorizontalScrollMode="Disabled"
+                    HorizontalScrollBarVisibility="Disabled">
                     <TextBlock
                         x:Name="PreviewText"
                         Padding="12"
                         FontFamily="Cascadia Mono, Consolas"
                         FontSize="12"
+                        TextWrapping="Wrap"
                         IsTextSelectionEnabled="True" />
                 </ScrollViewer>
                 <!-- Office vb. için Windows önizleyicisinin çizdiği alan -->

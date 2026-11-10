@@ -32,10 +32,12 @@ Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor
 - [x] Paneller arası sürüklenebilir ayırıcılar (çift tık: varsayılan)
 - [x] Pencere konum/boyutu, panel genişlikleri, son klasörler hatırlanıyor; ayarlardan sıfırlama
 - [x] Hata günlüğü (Yardım → Hata günlüğünü aç), beklenmeyen hatalarda uygulama kapanmıyor
+- [x] Önizlemede her şey panel genişliğine sığıyor; PDF sayfaları alt alta, aşağı kaydırarak
+- [x] Görünüm menüsünden açılıp kapanan sürücü çubuğu (doluluk göstergeli, tıklayınca aktif panelde açar)
 
 ## v0.3.x: Commander temelleri
 - [ ] Sekmeler (Ctrl+T, Ctrl+W, sekmeyi diğer panele sürükleme)
-- [ ] Sürücü çipleri ve doluluk göstergesi, tıklanabilir yol çubuğu (breadcrumb)
+- [ ] Tıklanabilir yol çubuğu (breadcrumb)
 - [ ] Insert/Space ile işaretleme, renkli işaretli dosyalar
 - [ ] Sıralama (ad, uzantı, boyut, tarih) ve sütun genişliği
 - [ ] Gerçek dosya simgeleri (shell icon), klasör izleme (FileSystemWatcher)

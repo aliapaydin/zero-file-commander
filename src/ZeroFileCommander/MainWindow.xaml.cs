@@ -29,6 +29,8 @@ public sealed partial class MainWindow : Window, IPaneHost
     private bool _exiting;
     private bool _trayHintShown;
     private string? _lastCapturedUrl;
+    private DateTime _drivesRefreshed = DateTime.MinValue;
+    private readonly List<(string Root, Button Button)> _driveButtons = new();
 
     public MainWindow()
     {
@@ -102,6 +104,12 @@ public sealed partial class MainWindow : Window, IPaneHost
         SetLeftRatio(_settings.LeftRatio);
         ApplyAllSettings();
         UpdateRibbon();
+
+        Activated += (_, e) =>
+        {
+            if (e.WindowActivationState != WindowActivationState.Deactivated) _ = RefreshDrivesAsync();
+        };
+        _ = RefreshDrivesAsync(force: true);
     }
 
     private FilePane Other => _active == LeftPane ? RightPane : LeftPane;
@@ -116,6 +124,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void SetActive(FilePane pane)
     {
+        HighlightActiveDrive(pane);
         if (_active != pane)
         {
             _active = pane;
@@ -128,6 +137,7 @@ public sealed partial class MainWindow : Window, IPaneHost
     private void Pane_SelectionChanged(object? sender, EventArgs e)
     {
         if (!ReferenceEquals(sender, _active)) return;
+        HighlightActiveDrive(_active);
         UpdateRibbon();
         if (_settings.ShowPreviewPane)
         {
@@ -325,6 +335,7 @@ public sealed partial class MainWindow : Window, IPaneHost
             case "app:hide": HideToTray(); break;
             case "app:downloads": ShowDownloads(); break;
             case "app:ribbon": _settings.ShowRibbon = !_settings.ShowRibbon; break;
+            case "app:drives": _settings.ShowDriveBar = !_settings.ShowDriveBar; break;
             case "app:tree": _settings.ShowFolderTree = !_settings.ShowFolderTree; break;
             case "app:preview": _settings.ShowPreviewPane = !_settings.ShowPreviewPane; break;
             case "app:hover": _settings.HoverPreview = !_settings.HoverPreview; break;
@@ -624,6 +635,8 @@ public sealed partial class MainWindow : Window, IPaneHost
 
         // Paneller
         RibbonArea.Visibility = _settings.ShowRibbon ? Visibility.Visible : Visibility.Collapsed;
+        DriveBar.Visibility = _settings.ShowDriveBar ? Visibility.Visible : Visibility.Collapsed;
+        MenuShowDrives.IsChecked = _settings.ShowDriveBar;
         MenuShowRibbon.IsChecked = _settings.ShowRibbon;
 
         bool tree = _settings.ShowFolderTree;
@@ -762,6 +775,131 @@ public sealed partial class MainWindow : Window, IPaneHost
             new NotificationAction("Aç", () => ShellActions.Open(item.FilePath), IsPrimary: true),
             new NotificationAction("Klasörde göster", () => ShellActions.ShowInExplorer(item.FilePath)));
     }
+
+    // ================================================================ Sürücü çubuğu
+
+    private sealed record DriveSnapshot(string Root, string Letter, string Label, DriveType Type, long Total, long Free);
+
+    private async Task RefreshDrivesAsync(bool force = false)
+    {
+        if (!force && (DateTime.Now - _drivesRefreshed).TotalSeconds < 3) return;
+        _drivesRefreshed = DateTime.Now;
+
+        // Ağ sürücüleri yavaş yanıt verebilir; bilgileri arka planda topla.
+        var drives = await Task.Run(() =>
+        {
+            var list = new List<DriveSnapshot>();
+            foreach (var d in DriveInfo.GetDrives())
+            {
+                try
+                {
+                    if (!d.IsReady) continue;
+                    var label = string.IsNullOrWhiteSpace(d.VolumeLabel) ? DriveTypeName(d.DriveType) : d.VolumeLabel;
+                    list.Add(new DriveSnapshot(d.RootDirectory.FullName, d.Name.TrimEnd('\\'), label, d.DriveType, d.TotalSize, d.AvailableFreeSpace));
+                }
+                catch
+                {
+                    // hazır olmayan sürücü
+                }
+            }
+            return list;
+        });
+
+        DrivePanel.Children.Clear();
+        _driveButtons.Clear();
+        foreach (var drive in drives)
+        {
+            var button = BuildDriveButton(drive);
+            DrivePanel.Children.Add(button);
+            _driveButtons.Add((drive.Root, button));
+        }
+        HighlightActiveDrive(_active);
+    }
+
+    private Button BuildDriveButton(DriveSnapshot drive)
+    {
+        double used = drive.Total > 0 ? (drive.Total - drive.Free) * 100.0 / drive.Total : 0;
+
+        var icon = new FontIcon { Glyph = DriveGlyph(drive.Type), FontSize = 22 };
+        var title = new TextBlock
+        {
+            Text = $"{drive.Letter}  {drive.Label}",
+            Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"],
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = 170,
+        };
+        var bar = new ProgressBar
+        {
+            Value = used,
+            Maximum = 100,
+            Width = 150,
+            MinHeight = 4,
+            Margin = new Thickness(0, 4, 0, 2),
+        };
+        if (used >= 90) bar.ShowError = true;
+        else if (used >= 75) bar.ShowPaused = true;
+        var free = new TextBlock
+        {
+            Text = $"{Models.FileItem.FormatSize(drive.Free)} boş / {Models.FileItem.FormatSize(drive.Total)}",
+            Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
+            Opacity = 0.75,
+        };
+
+        var texts = new StackPanel();
+        texts.Children.Add(title);
+        texts.Children.Add(bar);
+        texts.Children.Add(free);
+
+        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        content.Children.Add(icon);
+        content.Children.Add(texts);
+
+        var button = new Button
+        {
+            Content = content,
+            Padding = new Thickness(12, 8, 14, 8),
+            Tag = drive.Root,
+            BorderThickness = new Thickness(1),
+        };
+        ToolTipService.SetToolTip(button, $"{drive.Letter} sürücüsünü aktif panelde aç · %{used:0} dolu");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, $"{drive.Letter} {drive.Label}");
+        button.Click += (_, _) =>
+        {
+            _active.Navigate(drive.Root);
+            _active.FocusList();
+        };
+        return button;
+    }
+
+    private void HighlightActiveDrive(FilePane pane)
+    {
+        var path = pane.CurrentPath;
+        var accent = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
+        var normal = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ControlStrokeColorDefaultBrush"];
+        foreach (var (root, button) in _driveButtons)
+        {
+            bool current = path.Length > 0 && path.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+            button.BorderBrush = current ? accent : normal;
+            button.BorderThickness = new Thickness(current ? 2 : 1);
+        }
+    }
+
+    private static string DriveGlyph(DriveType type) => type switch
+    {
+        DriveType.Removable => "\uE88E",
+        DriveType.Network => "\uE8CE",
+        DriveType.CDRom => "\uE958",
+        _ => "\uEDA2",
+    };
+
+    private static string DriveTypeName(DriveType type) => type switch
+    {
+        DriveType.Removable => "Çıkarılabilir disk",
+        DriveType.Network => "Ağ sürücüsü",
+        DriveType.CDRom => "CD/DVD",
+        DriveType.Ram => "RAM disk",
+        _ => "Yerel disk",
+    };
 
     // ================================================================ Yerleşim
 
