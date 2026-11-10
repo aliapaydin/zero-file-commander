@@ -1,0 +1,40 @@
+# Build çıktıları
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+ARM64/
+AppPackages/
+BundleArtifacts/
+*.msix
+*.msixbundle
+*.msixupload
+*.appx
+*.appxbundle
+*.appxupload
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+launchSettings.local.json
+
+# İmzalama sertifikaları (asla commit etme)
+*.pfx
+*.p12
+*.cer
+
+# NuGet
+*.nupkg
+packages/
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# İşletim sistemi
+Thumbs.db
+.DS_Store

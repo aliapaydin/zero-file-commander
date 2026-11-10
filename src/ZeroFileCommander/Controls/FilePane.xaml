@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="ZeroFileCommander.Controls.FilePane"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:ZeroFileCommander.Models"
+    GotFocus="OnGotFocus">
+
+    <Border
+        x:Name="RootBorder"
+        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+        BorderThickness="1"
+        CornerRadius="10">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+            <!-- Yol çubuğu -->
+            <Grid Grid.Row="0" Padding="8" ColumnSpacing="6" ColumnDefinitions="Auto,*">
+                <Button
+                    x:Name="UpButton"
+                    Click="UpButton_Click"
+                    ToolTipService.ToolTip="Üst klasör (Backspace)"
+                    AutomationProperties.Name="Üst klasör">
+                    <FontIcon Glyph="&#xE74A;" FontSize="14" />
+                </Button>
+                <TextBox
+                    x:Name="PathBox"
+                    Grid.Column="1"
+                    KeyDown="PathBox_KeyDown"
+                    AutomationProperties.Name="Klasör yolu" />
+            </Grid>
+
+            <!-- Sütun başlıkları -->
+            <Grid
+                Grid.Row="1"
+                Padding="16,4,16,4"
+                ColumnSpacing="8"
+                ColumnDefinitions="24,*,90,130"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+                <TextBlock Grid.Column="1" Text="Ad" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock Grid.Column="2" Text="Boyut" HorizontalAlignment="Right" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock Grid.Column="3" Text="Değiştirilme" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </Grid>
+
+            <!-- Dosya listesi -->
+            <ListView
+                x:Name="FileList"
+                Grid.Row="2"
+                ItemsSource="{x:Bind Items}"
+                SelectionMode="Extended"
+                IsDoubleTapEnabled="True"
+                DoubleTapped="List_DoubleTapped"
+                KeyDown="List_KeyDown"
+                SelectionChanged="List_SelectionChanged"
+                AutomationProperties.Name="Dosyalar">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+                        <Setter Property="MinHeight" Value="30" />
+                        <Setter Property="Padding" Value="8,0,8,0" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="models:FileItem">
+                        <Grid ColumnSpacing="8" ColumnDefinitions="24,*,90,130">
+                            <FontIcon Glyph="{x:Bind Glyph}" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            <TextBlock Grid.Column="1" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="{x:Bind SizeText}" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Grid.Column="3" Text="{x:Bind ModifiedText}" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- Durum satırı -->
+            <TextBlock
+                x:Name="StatusText"
+                Grid.Row="3"
+                Margin="12,6,12,8"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Grid>
+    </Border>
+</UserControl>

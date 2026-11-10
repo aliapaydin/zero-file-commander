@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="ZeroFileCommander.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Marka renkleri (bkz. docs/DESIGN.md) -->
+            <Color x:Key="ZeroBlue">#1F6FD6</Color>
+            <Color x:Key="SignalAmber">#F2B84B</Color>
+            <SolidColorBrush x:Key="MarkedItemBrush" Color="#C98A12" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
