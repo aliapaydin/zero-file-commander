@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="ZeroFileCommander.Views.SettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer MaxHeight="560" Padding="0,0,16,0">
+        <StackPanel Spacing="20" Width="460">
+
+            <!-- Görünüm -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="Görünüm" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <RadioButtons x:Name="ThemeChoice" Header="Tema" SelectionChanged="ThemeChoice_SelectionChanged" MaxColumns="3">
+                    <x:String>Sisteme göre</x:String>
+                    <x:String>Aydınlık</x:String>
+                    <x:String>Karanlık</x:String>
+                </RadioButtons>
+                <ToggleSwitch x:Name="HoverToggle" Header="Üzerine gelince önizle (görsel, video, PDF)" Toggled="HoverToggle_Toggled" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="Bekleme" VerticalAlignment="Center" />
+                    <Slider x:Name="HoverDelay" Width="220" Minimum="0" Maximum="1000" StepFrequency="50" ValueChanged="HoverDelay_ValueChanged" />
+                    <TextBlock x:Name="HoverDelayText" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Arka plan -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="Arka planda çalışma" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <ToggleSwitch x:Name="BackgroundToggle" Header="Pencereyi kapatınca sistem tepsisinde çalışmaya devam et" Toggled="BackgroundToggle_Toggled" />
+                <ToggleSwitch x:Name="MinimizeToggle" Header="Simge durumuna küçültünce tepsiye gizle" Toggled="MinimizeToggle_Toggled" />
+                <TextBlock
+                    TextWrapping="Wrap"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="Tepsiye gizlenince görev çubuğu düğmesi kaybolur; indirme ilerlemesi o sırada tepsi simgesinin ipucunda görünür." />
+            </StackPanel>
+
+            <!-- İndirmeler -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="İndirmeler" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <ToggleSwitch x:Name="DownloadsToggle" Header="İndirme yöneticisini etkinleştir" Toggled="DownloadsToggle_Toggled" />
+                <StackPanel x:Name="DownloadOptions" Spacing="10">
+                    <Grid ColumnSpacing="8" ColumnDefinitions="*,Auto">
+                        <TextBox x:Name="FolderBox" Header="İndirme klasörü" IsReadOnly="True" />
+                        <Button Grid.Column="1" VerticalAlignment="Bottom" Content="Seç…" Click="PickFolder_Click" />
+                    </Grid>
+                    <ToggleSwitch x:Name="ClipboardToggle" Header="Panoya kopyalanan indirme bağlantılarını yakala" Toggled="ClipboardToggle_Toggled" />
+                    <TextBlock
+                        TextWrapping="Wrap"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="Windows'ta tarayıcıların indirmelerini devralan bir 'varsayılan indirici' ayarı yok. Şimdilik bağlantıyı kopyalaman yeterli; tarayıcı eklentisi yol haritasında." />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Bildirimler -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="Bildirimler" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <ComboBox x:Name="PositionChoice" Header="Bildirim kutusunun konumu" Width="260" SelectionChanged="PositionChoice_SelectionChanged">
+                    <x:String>Sağ alt</x:String>
+                    <x:String>Sağ üst</x:String>
+                    <x:String>Sol alt</x:String>
+                    <x:String>Sol üst</x:String>
+                    <x:String>Alt orta</x:String>
+                </ComboBox>
+                <Button Content="Örnek bildirim göster" Click="TestNotification_Click" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

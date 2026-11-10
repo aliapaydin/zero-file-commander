@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="ZeroFileCommander.Views.DownloadsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:services="using:ZeroFileCommander.Services"
+    Title="İndirmeler — Zero File Commander">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootGrid" RowDefinitions="40,Auto,*,Auto">
+        <Grid x:Name="TitleBarArea" Padding="14,0,0,0" ColumnSpacing="10" ColumnDefinitions="Auto,*">
+            <FontIcon Glyph="&#xE896;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+            <TextBlock Grid.Column="1" Text="İndirmeler" VerticalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" />
+        </Grid>
+
+        <!-- Yeni indirme -->
+        <Grid Grid.Row="1" Padding="16,8,16,12" RowSpacing="8" ColumnSpacing="8" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+            <TextBox
+                x:Name="UrlBox"
+                PlaceholderText="İndirme bağlantısını yapıştır (https://…)"
+                KeyDown="UrlBox_KeyDown"
+                AutomationProperties.Name="İndirme bağlantısı" />
+            <Button Grid.Column="1" Style="{StaticResource AccentButtonStyle}" Click="Download_Click">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE896;" FontSize="14" />
+                    <TextBlock Text="İndir" />
+                </StackPanel>
+            </Button>
+            <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8">
+                <FontIcon Glyph="&#xE8B7;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock x:Name="FolderText" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <HyperlinkButton Padding="4,0" Content="Değiştir" Click="ChangeFolder_Click" />
+                <HyperlinkButton Padding="4,0" Content="Klasörü aç" Click="OpenFolder_Click" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Liste -->
+        <ListView
+            x:Name="DownloadList"
+            Grid.Row="2"
+            Padding="8,0,8,8"
+            SelectionMode="None"
+            ItemsSource="{x:Bind Manager.Items}">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Margin" Value="0,0,0,6" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="services:DownloadItem">
+                    <Border
+                        Padding="14,12"
+                        CornerRadius="8"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1">
+                        <Grid ColumnSpacing="12" RowSpacing="6" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+                            <FontIcon Grid.RowSpan="3" Glyph="&#xE8A5;" FontSize="22" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            <TextBlock Grid.Column="1" Text="{x:Bind FileName, Mode=OneWay}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" />
+                            <ProgressBar
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Maximum="100"
+                                Value="{x:Bind Progress, Mode=OneWay}"
+                                IsIndeterminate="{x:Bind IsIndeterminate, Mode=OneWay}"
+                                Visibility="{x:Bind ProgressVisibility, Mode=OneWay}" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{x:Bind StatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <StackPanel Grid.Column="2" Grid.RowSpan="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <Button Click="Pause_Click" Visibility="{x:Bind PauseVisibility, Mode=OneWay}" ToolTipService.ToolTip="Duraklat" AutomationProperties.Name="Duraklat"><FontIcon Glyph="&#xE769;" FontSize="13" /></Button>
+                                <Button Click="Resume_Click" Visibility="{x:Bind ResumeVisibility, Mode=OneWay}" ToolTipService.ToolTip="Devam et" AutomationProperties.Name="Devam et"><FontIcon Glyph="&#xE768;" FontSize="13" /></Button>
+                                <Button Click="Open_Click" Visibility="{x:Bind OpenVisibility, Mode=OneWay}" ToolTipService.ToolTip="Aç" AutomationProperties.Name="Aç"><FontIcon Glyph="&#xE8E5;" FontSize="13" /></Button>
+                                <Button Click="ShowInFolder_Click" Visibility="{x:Bind OpenVisibility, Mode=OneWay}" ToolTipService.ToolTip="Klasörde göster" AutomationProperties.Name="Klasörde göster"><FontIcon Glyph="&#xE838;" FontSize="13" /></Button>
+                                <Button Click="Cancel_Click" Visibility="{x:Bind CancelVisibility, Mode=OneWay}" ToolTipService.ToolTip="İptal" AutomationProperties.Name="İptal"><FontIcon Glyph="&#xE711;" FontSize="13" /></Button>
+                                <Button Click="Remove_Click" ToolTipService.ToolTip="Listeden kaldır" AutomationProperties.Name="Listeden kaldır"><FontIcon Glyph="&#xE74D;" FontSize="13" /></Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <TextBlock
+            x:Name="EmptyText"
+            Grid.Row="2"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Text="Henüz indirme yok"
+            Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+
+        <Grid Grid.Row="3" Padding="16,8,16,12" ColumnDefinitions="*,Auto" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+            <TextBlock x:Name="SummaryText" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Button Grid.Column="1" Content="Bitenleri temizle" Click="ClearFinished_Click" />
+        </Grid>
+    </Grid>
+</Window>

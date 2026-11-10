@@ -12,12 +12,11 @@
         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
         BorderThickness="1"
         CornerRadius="10">
-        <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <Grid x:Name="PaneGrid" RowDefinitions="Auto,Auto,*,Auto">
 
             <!-- Yol çubuğu -->
             <Grid Grid.Row="0" Padding="8" ColumnSpacing="6" ColumnDefinitions="Auto,*">
                 <Button
-                    x:Name="UpButton"
                     Click="UpButton_Click"
                     ToolTipService.ToolTip="Üst klasör (Backspace)"
                     AutomationProperties.Name="Üst klasör">
@@ -50,9 +49,17 @@
                 ItemsSource="{x:Bind Items}"
                 SelectionMode="Extended"
                 IsDoubleTapEnabled="True"
+                CanDragItems="True"
+                AllowDrop="True"
                 DoubleTapped="List_DoubleTapped"
                 KeyDown="List_KeyDown"
                 SelectionChanged="List_SelectionChanged"
+                RightTapped="List_RightTapped"
+                DragItemsStarting="List_DragItemsStarting"
+                DragItemsCompleted="List_DragItemsCompleted"
+                DragOver="List_DragOver"
+                DragLeave="List_DragLeave"
+                Drop="List_Drop"
                 AutomationProperties.Name="Dosyalar">
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
@@ -62,7 +69,12 @@
                 </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:FileItem">
-                        <Grid ColumnSpacing="8" ColumnDefinitions="24,*,90,130">
+                        <Grid
+                            ColumnSpacing="8"
+                            ColumnDefinitions="24,*,90,130"
+                            Background="Transparent"
+                            PointerEntered="Row_PointerEntered"
+                            PointerExited="Row_PointerExited">
                             <FontIcon Glyph="{x:Bind Glyph}" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                             <TextBlock Grid.Column="1" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="2" Text="{x:Bind SizeText}" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -72,6 +84,21 @@
                 </ListView.ItemTemplate>
             </ListView>
 
+            <!-- Bırakma ipucu -->
+            <Border
+                x:Name="DropHint"
+                Grid.Row="2"
+                Margin="8"
+                Padding="12,8"
+                VerticalAlignment="Bottom"
+                HorizontalAlignment="Center"
+                CornerRadius="8"
+                IsHitTestVisible="False"
+                Visibility="Collapsed"
+                Background="{ThemeResource AccentFillColorDefaultBrush}">
+                <TextBlock x:Name="DropHintText" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" Style="{StaticResource BodyStrongTextBlockStyle}" />
+            </Border>
+
             <!-- Durum satırı -->
             <TextBlock
                 x:Name="StatusText"
@@ -79,6 +106,26 @@
                 Margin="12,6,12,8"
                 Style="{StaticResource CaptionTextBlockStyle}"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+            <!-- Üzerine gelince hızlı bakış -->
+            <Popup x:Name="HoverPopup" Grid.RowSpan="4" IsLightDismissEnabled="False">
+                <Border
+                    Width="300"
+                    Padding="10"
+                    CornerRadius="12"
+                    IsHitTestVisible="False"
+                    Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
+                    BorderThickness="1">
+                    <StackPanel Spacing="8">
+                        <Border CornerRadius="8" MaxHeight="220" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                            <Image x:Name="HoverImage" Stretch="Uniform" MaxHeight="220" />
+                        </Border>
+                        <TextBlock x:Name="HoverTitle" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="HoverMeta" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+            </Popup>
         </Grid>
     </Border>
 </UserControl>

@@ -10,45 +10,308 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="RootGrid" RowDefinitions="48,*,Auto" PreviewKeyDown="RootGrid_PreviewKeyDown">
+    <Grid
+        x:Name="RootGrid"
+        RowDefinitions="36,Auto,Auto,*,Auto"
+        PreviewKeyDown="RootGrid_PreviewKeyDown"
+        ActualThemeChanged="RootGrid_ActualThemeChanged">
         <Grid.KeyboardAccelerators>
-            <KeyboardAccelerator Key="F3" Invoked="View_Invoked" />
-            <KeyboardAccelerator Key="F4" Invoked="Edit_Invoked" />
-            <KeyboardAccelerator Key="F5" Invoked="Copy_Invoked" />
-            <KeyboardAccelerator Key="F6" Invoked="Move_Invoked" />
-            <KeyboardAccelerator Key="F7" Invoked="NewFolder_Invoked" />
-            <KeyboardAccelerator Key="F8" Invoked="Delete_Invoked" />
-            <KeyboardAccelerator Key="Delete" Invoked="Delete_Invoked" />
-            <KeyboardAccelerator Key="R" Modifiers="Control" Invoked="Refresh_Invoked" />
+            <KeyboardAccelerator Key="F2" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="F3" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="F4" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="F5" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="F6" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="F7" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="F8" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="Delete" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="X" Modifiers="Control" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="V" Modifiers="Control" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="C" Modifiers="Control,Shift" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="R" Modifiers="Control" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="Enter" Modifiers="Menu" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="Q" Modifiers="Control" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="E" Modifiers="Control,Shift" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="J" Modifiers="Control" Invoked="Accel_Invoked" />
+            <KeyboardAccelerator Key="F1" Invoked="Accel_Invoked" />
         </Grid.KeyboardAccelerators>
 
         <!-- Başlık çubuğu (sürüklenebilir alan) -->
         <Grid x:Name="AppTitleBar" Padding="14,0,0,0" ColumnSpacing="10" ColumnDefinitions="Auto,Auto,*">
-            <Image Source="ms-appx:///Assets/Square44x44Logo.targetsize-24_altform-unplated.png" Width="22" Height="22" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Text="Zero File Commander" VerticalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" />
+            <Image Source="ms-appx:///Assets/Square44x44Logo.targetsize-24_altform-unplated.png" Width="18" Height="18" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="Zero File Commander" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" />
         </Grid>
 
-        <!-- Paneller -->
-        <Grid Grid.Row="1" Padding="10,0,10,8" ColumnSpacing="8" ColumnDefinitions="*,*">
-            <controls:FilePane x:Name="LeftPane" />
-            <controls:FilePane x:Name="RightPane" Grid.Column="1" />
+        <!-- Uygulama menüsü -->
+        <MenuBar x:Name="MainMenu" Grid.Row="1" Padding="4,0,0,0">
+            <MenuBarItem Title="Dosya">
+                <MenuFlyoutItem Text="Aç" Tag="Open" Click="Command_Click" KeyboardAcceleratorTextOverride="Enter">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8E5;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Birlikte aç…" Tag="OpenWith" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE7AC;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Yeni klasör" Tag="NewFolder" Click="Command_Click" KeyboardAcceleratorTextOverride="F7">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8F4;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Terminalde aç" Tag="OpenTerminal" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE756;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Dosya Gezgini'nde göster" Tag="ShowInExplorer" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE838;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Özellikler" Tag="Properties" Click="Command_Click" KeyboardAcceleratorTextOverride="Alt+Enter">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE946;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Ayarlar" Tag="app:settings" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+,">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE713;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Pencereyi kapat" Tag="app:close" Click="Command_Click" KeyboardAcceleratorTextOverride="Alt+F4" />
+                <MenuFlyoutItem Text="Çıkış" Tag="app:exit" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE7E8;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+            </MenuBarItem>
+
+            <MenuBarItem Title="Düzen">
+                <MenuFlyoutItem Text="Kes" Tag="Cut" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+X">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C6;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Kopyala" Tag="Copy" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+C">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem x:Name="MenuPaste" Text="Yapıştır" Tag="Paste" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+V">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE77F;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Yeniden adlandır" Tag="Rename" Click="Command_Click" KeyboardAcceleratorTextOverride="F2">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8AC;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Sil" Tag="Delete" Click="Command_Click" KeyboardAcceleratorTextOverride="Del">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Tümünü seç" Tag="app:selectall" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+A" />
+                <MenuFlyoutItem Text="Seçimi tersine çevir" Tag="app:invert" Click="Command_Click" />
+                <MenuFlyoutItem Text="Yolu kopyala" Tag="CopyPath" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+C">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE71B;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+            </MenuBarItem>
+
+            <MenuBarItem Title="İşlemler">
+                <MenuFlyoutItem Text="Karşı panele kopyala" Tag="CopyToOther" Click="Command_Click" KeyboardAcceleratorTextOverride="F5">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Karşı panele taşı" Tag="MoveToOther" Click="Command_Click" KeyboardAcceleratorTextOverride="F6">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8DE;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Önizle" Tag="Preview" Click="Command_Click" KeyboardAcceleratorTextOverride="Space">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8FF;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Hızlı çal" Tag="Play" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE768;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Düzenle" Tag="Edit" Click="Command_Click" KeyboardAcceleratorTextOverride="F4">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE70F;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Yenile" Tag="Refresh" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+R">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE72C;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Panelleri eşitle" Tag="app:samefolder" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE895;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Panelleri değiştir" Tag="app:swap" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8AB;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+            </MenuBarItem>
+
+            <MenuBarItem Title="Görünüm">
+                <ToggleMenuFlyoutItem x:Name="MenuShowRibbon" Text="Şerit" Tag="app:ribbon" Click="Command_Click" />
+                <ToggleMenuFlyoutItem x:Name="MenuShowTree" Text="Klasör ağacı" Tag="app:tree" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+E" />
+                <ToggleMenuFlyoutItem x:Name="MenuShowPreview" Text="Önizleme paneli" Tag="app:preview" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+Q" />
+                <ToggleMenuFlyoutItem x:Name="MenuHover" Text="Üzerine gelince önizle" Tag="app:hover" Click="Command_Click" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutSubItem Text="Tema">
+                    <MenuFlyoutSubItem.Icon><FontIcon Glyph="&#xE790;" /></MenuFlyoutSubItem.Icon>
+                    <RadioMenuFlyoutItem x:Name="MenuThemeSystem" Text="Sisteme göre" GroupName="theme" Tag="app:theme:0" Click="Command_Click" />
+                    <RadioMenuFlyoutItem x:Name="MenuThemeLight" Text="Aydınlık" GroupName="theme" Tag="app:theme:1" Click="Command_Click" />
+                    <RadioMenuFlyoutItem x:Name="MenuThemeDark" Text="Karanlık" GroupName="theme" Tag="app:theme:2" Click="Command_Click" />
+                </MenuFlyoutSubItem>
+            </MenuBarItem>
+
+            <MenuBarItem Title="Pencere">
+                <MenuFlyoutItem x:Name="MenuDownloads" Text="İndirmeler" Tag="app:downloads" Click="Command_Click" KeyboardAcceleratorTextOverride="Ctrl+J">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE896;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Tepsiye gizle" Tag="app:hide" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE921;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Sol panele odaklan" Tag="app:focusleft" Click="Command_Click" />
+                <MenuFlyoutItem Text="Sağ panele odaklan" Tag="app:focusright" Click="Command_Click" />
+            </MenuBarItem>
+
+            <MenuBarItem Title="Yardım">
+                <MenuFlyoutItem Text="Klavye kısayolları" Tag="app:shortcuts" Click="Command_Click" KeyboardAcceleratorTextOverride="F1">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE765;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="GitHub sayfası" Tag="app:github" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE774;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Hata bildir" Tag="app:issues" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xEBE8;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Zero File Commander hakkında" Tag="app:about" Click="Command_Click">
+                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE946;" /></MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+            </MenuBarItem>
+        </MenuBar>
+
+        <!-- Bağlamsal şerit -->
+        <Grid x:Name="RibbonArea" Grid.Row="2" Padding="8,0,8,6" ColumnSpacing="8" ColumnDefinitions="Auto,*">
+            <Border
+                x:Name="ContextTag"
+                Padding="10,4"
+                VerticalAlignment="Center"
+                CornerRadius="6"
+                Visibility="Collapsed"
+                Background="{ThemeResource AccentFillColorDefaultBrush}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon x:Name="ContextTagIcon" FontSize="13" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                    <TextBlock x:Name="ContextTagText" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                </StackPanel>
+            </Border>
+            <CommandBar
+                x:Name="Ribbon"
+                Grid.Column="1"
+                HorizontalAlignment="Left"
+                DefaultLabelPosition="Right"
+                Background="Transparent"
+                IsDynamicOverflowEnabled="True">
+                <AppBarButton x:Name="RbNewFolder" Label="Yeni klasör" Tag="NewFolder" Click="Command_Click" ToolTipService.ToolTip="Yeni klasör (F7)">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8F4;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbPaste" Label="Yapıştır" Tag="Paste" Click="Command_Click" ToolTipService.ToolTip="Yapıştır (Ctrl+V)">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE77F;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarSeparator x:Name="RbSep1" />
+                <AppBarButton x:Name="RbCut" Label="Kes" Tag="Cut" Click="Command_Click" ToolTipService.ToolTip="Kes (Ctrl+X)">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8C6;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbCopy" Label="Kopyala" Tag="Copy" Click="Command_Click" ToolTipService.ToolTip="Kopyala (Ctrl+C)">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8C8;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbRename" Label="Yeniden adlandır" Tag="Rename" Click="Command_Click" ToolTipService.ToolTip="Yeniden adlandır (F2)">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8AC;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbDelete" Label="Sil" Tag="Delete" Click="Command_Click" ToolTipService.ToolTip="Geri Dönüşüm Kutusu'na gönder (Del)">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE74D;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarSeparator x:Name="RbSep2" />
+                <AppBarButton x:Name="RbCopyOther" Label="Karşıya kopyala" Tag="CopyToOther" Click="Command_Click" ToolTipService.ToolTip="Karşı panele kopyala (F5)">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8C8;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbMoveOther" Label="Karşıya taşı" Tag="MoveToOther" Click="Command_Click" ToolTipService.ToolTip="Karşı panele taşı (F6)">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8DE;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarSeparator x:Name="RbSep3" />
+                <AppBarButton x:Name="RbPlay" Label="Çal" Tag="Play" Click="Command_Click">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE768;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbPreview" Label="Önizle" Tag="Preview" Click="Command_Click" ToolTipService.ToolTip="Önizle (Space)">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8FF;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbEdit" Label="Düzenle" Tag="Edit" Click="Command_Click" ToolTipService.ToolTip="Düzenle (F4)">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE70F;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbOpenWith" Label="Birlikte aç" Tag="OpenWith" Click="Command_Click">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE7AC;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbAdmin" Label="Yönetici olarak çalıştır" Tag="RunAsAdmin" Click="Command_Click">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE7EF;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbTerminal" Label="Terminal" Tag="OpenTerminal" Click="Command_Click">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE756;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RbProperties" Label="Özellikler" Tag="Properties" Click="Command_Click" ToolTipService.ToolTip="Özellikler (Alt+Enter)">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE946;" /></AppBarButton.Icon>
+                </AppBarButton>
+            </CommandBar>
         </Grid>
 
-        <!-- Fonksiyon tuşu çubuğu -->
-        <Grid Grid.Row="2" Padding="10,6,10,10" ColumnDefinitions="*,Auto"
-              BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+        <!-- İçerik: klasör ağacı | sol panel | sağ panel | önizleme -->
+        <Grid x:Name="ContentGrid" Grid.Row="3" Padding="10,0,10,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="TreeColumn" Width="0" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="PreviewColumn" Width="0" />
+            </Grid.ColumnDefinitions>
+
+            <Border
+                x:Name="TreeHost"
+                Margin="0,0,8,0"
+                Padding="4"
+                Visibility="Collapsed"
+                CornerRadius="10"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1">
+                <TreeView
+                    x:Name="FolderTree"
+                    SelectionMode="Single"
+                    Expanding="FolderTree_Expanding"
+                    ItemInvoked="FolderTree_ItemInvoked" />
+            </Border>
+
+            <controls:FilePane x:Name="LeftPane" Grid.Column="1" Margin="0,0,4,0" />
+            <controls:FilePane x:Name="RightPane" Grid.Column="2" Margin="4,0,0,0" />
+
+            <controls:PreviewPane x:Name="Preview" Grid.Column="3" Margin="8,0,0,0" Visibility="Collapsed" />
+        </Grid>
+
+        <!-- Alt çubuk: fonksiyon tuşları + indirme takibi -->
+        <Grid
+            Grid.Row="4"
+            Padding="10,6,10,10"
+            ColumnSpacing="12"
+            ColumnDefinitions="*,Auto,Auto"
+            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+            BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" Spacing="6">
-                <Button Click="View_Click">F3 Görüntüle</Button>
-                <Button Click="Edit_Click">F4 Düzenle</Button>
-                <Button Click="Copy_Click" Style="{StaticResource AccentButtonStyle}">F5 Kopyala →</Button>
-                <Button Click="Move_Click">F6 Taşı →</Button>
-                <Button Click="NewFolder_Click">F7 Yeni klasör</Button>
-                <Button Click="Delete_Click">F8 Sil</Button>
+                <Button Tag="Preview" Click="Command_Click">F3 Görüntüle</Button>
+                <Button Tag="Edit" Click="Command_Click">F4 Düzenle</Button>
+                <Button Tag="CopyToOther" Click="Command_Click" Style="{StaticResource AccentButtonStyle}">F5 Kopyala →</Button>
+                <Button Tag="MoveToOther" Click="Command_Click">F6 Taşı →</Button>
+                <Button Tag="NewFolder" Click="Command_Click">F7 Yeni klasör</Button>
+                <Button Tag="Delete" Click="Command_Click">F8 Sil</Button>
             </StackPanel>
-            <TextBlock x:Name="HintText" Grid.Column="1" VerticalAlignment="Center"
-                       Style="{StaticResource CaptionTextBlockStyle}"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                       Text="Tab: panel değiştir · Enter: aç · Backspace: üst klasör" />
+
+            <Button
+                x:Name="DownloadIndicator"
+                Grid.Column="1"
+                Visibility="Collapsed"
+                Tag="app:downloads"
+                Click="Command_Click"
+                ToolTipService.ToolTip="İndirmeleri göster (Ctrl+J)">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <FontIcon Glyph="&#xE896;" FontSize="14" />
+                    <TextBlock x:Name="DownloadIndicatorText" VerticalAlignment="Center" />
+                    <ProgressBar x:Name="DownloadIndicatorBar" Width="90" Maximum="100" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+
+            <TextBlock
+                x:Name="HintText"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="Tab: panel değiştir · Sürükle: taşı, Ctrl: kopyala" />
         </Grid>
     </Grid>
 </Window>
