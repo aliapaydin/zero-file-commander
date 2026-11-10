@@ -101,7 +101,8 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (isPrimary)
         {
             _tray = new TrayIcon(hwnd, iconPath, "Zero File Commander") { MenuProvider = BuildTrayMenu };
-            _tray.OpenRequested += (_, _) => ShowFromTray();
+            // Pencere yordamının içinde değil, hemen ardından aç (aksi halde pencere öne gelmeyebilir).
+            _tray.OpenRequested += (_, _) => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.High, ShowFromTray);
             if (_settings.RunInBackground) _tray.Show();
 
             DownloadManager.Current.Attach(DispatcherQueue);
@@ -148,6 +149,9 @@ public sealed partial class MainWindow : Window, IPaneHost
             RightPane.Restore(rightPath ?? string.Empty);
             Title = "Zero File Commander · " + All.Count;
         }
+
+        // PIN etkinse uygulama kilitli açılır (paneller arkada hazırlanır, uzak bağlantılar kilit açılınca kurulur).
+        if (isPrimary && AppLock.IsEnabled) LockApp();
         SetActive(LeftPane);
         LeftPane.FocusList();
 
@@ -256,6 +260,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void RootGrid_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (_locked) return; // kilit ekranı yalnızca PIN kutusuna yazdırır
         if (Palette.IsOpen) return; // palet kendi tuşlarını yönetir
         bool inText = FocusManager.GetFocusedElement(Content.XamlRoot) is TextBox;
 
@@ -292,6 +297,11 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void Accel_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
+        if (_locked)
+        {
+            args.Handled = true;
+            return;
+        }
         bool inText = FocusManager.GetFocusedElement(Content.XamlRoot) is TextBox;
         bool ctrl = sender.Modifiers.HasFlag(VirtualKeyModifiers.Control);
         bool shift = sender.Modifiers.HasFlag(VirtualKeyModifiers.Shift);
@@ -1238,7 +1248,9 @@ public sealed partial class MainWindow : Window, IPaneHost
         {
             bool current = path.Length > 0 && path.StartsWith(root, StringComparison.OrdinalIgnoreCase);
             button.BorderBrush = current ? accent : normal;
+            // Kalın kenarlık dolguyla dengelenir: seçim değişince düğme boyu ve alttaki paneller kaymasın.
             button.BorderThickness = new Thickness(current ? 2 : 1);
+            button.Padding = current ? new Thickness(11, 7, 13, 7) : new Thickness(12, 8, 14, 8);
         }
     }
 
@@ -1585,6 +1597,109 @@ public sealed partial class MainWindow : Window, IPaneHost
         _active.ShowStatus($"{selection.Count} öğe diğer pencereye gönderildi → {target.CurrentPath}");
     }
 
+    // ================================================================ Uygulama kilidi (PIN)
+
+    private bool _locked;
+    private bool _lockOnShow;
+    private TaskCompletionSource _unlocked = CreateUnlocked();
+
+    private static TaskCompletionSource CreateUnlocked()
+    {
+        var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        source.SetResult();
+        return source;
+    }
+
+    private void LockApp()
+    {
+        if (_locked) return;
+        _locked = true;
+        _unlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Preview.Stop();
+        Palette.Close();
+        Overlay.Push(); // Office önizleyicisinin pencere katmanı kilidin üstünde kalmasın
+        PinBox.Password = string.Empty;
+        PinError.Text = string.Empty;
+        UpdatePinDots(0);
+        LockScreen.Visibility = Visibility.Visible;
+        PinBox.Focus(FocusState.Programmatic);
+    }
+
+    private void UnlockApp()
+    {
+        if (!_locked) return;
+        _locked = false;
+        LockScreen.Visibility = Visibility.Collapsed;
+        Overlay.Pop();
+        PinBox.Password = string.Empty;
+        _unlocked.TrySetResult();
+        _active.FocusList();
+        if (_settings.ShowPreviewPane) _ = UpdatePreviewAsync(autoPlay: false);
+    }
+
+    private void UpdatePinDots(int filled)
+    {
+        if (PinDots.Children.Count == 0)
+        {
+            for (int i = 0; i < 4; i++)
+                PinDots.Children.Add(new Microsoft.UI.Xaml.Shapes.Ellipse { Width = 14, Height = 14, StrokeThickness = 1.5 });
+        }
+        var accent = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
+        var stroke = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ControlStrongStrokeColorDefaultBrush"];
+        for (int i = 0; i < 4; i++)
+        {
+            var dot = (Microsoft.UI.Xaml.Shapes.Ellipse)PinDots.Children[i];
+            dot.Stroke = i < filled ? accent : stroke;
+            dot.Fill = i < filled ? accent : null;
+        }
+    }
+
+    private bool _checkingPin;
+
+    private async void PinBox_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        // Yalnızca rakam; 4. hanede otomatik dene.
+        var digits = new string(PinBox.Password.Where(char.IsAsciiDigit).Take(4).ToArray());
+        if (digits != PinBox.Password)
+        {
+            PinBox.Password = digits;
+            return;
+        }
+        UpdatePinDots(digits.Length);
+        if (digits.Length > 0) PinError.Text = string.Empty;
+        if (digits.Length < 4 || _checkingPin) return;
+
+        if (AppLock.Cooldown is { } wait)
+        {
+            PinError.Text = $"Çok fazla yanlış deneme. {Math.Ceiling(wait.TotalSeconds)} sn sonra tekrar deneyin.";
+            PinBox.Password = string.Empty;
+            return;
+        }
+        _checkingPin = true;
+        bool ok = await Task.Run(() => AppLock.Verify(digits)); // özet hesabı arayüzü dondurmasın
+        _checkingPin = false;
+        if (ok)
+        {
+            UnlockApp();
+            return;
+        }
+        PinBox.Password = string.Empty;
+        PinError.Text = AppLock.Cooldown is { } blocked
+            ? $"Çok fazla yanlış deneme. {Math.Ceiling(blocked.TotalSeconds)} sn bekleyin."
+            : "PIN yanlış.";
+    }
+
+    private void PinBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Escape)
+        {
+            PinBox.Password = string.Empty;
+            e.Handled = true;
+        }
+    }
+
+    private void LockExit_Click(object sender, RoutedEventArgs e) => ExitApplication();
+
     // ================================================================ Faz 5: bağlantılar
 
     private void ConnectionStore_Changed(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(BuildConnectionsMenu);
@@ -1690,6 +1805,8 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     public async Task<IRemoteSession?> ConnectRemoteAsync(SavedConnection connection)
     {
+        // Kilit açılmadan parola/anahtar diyaloğu gösterme.
+        await _unlocked.Task;
         // İki panel aynı anda bağlanırsa diyaloglar üst üste açılmasın.
         await _connectGate.WaitAsync();
         try
@@ -1997,6 +2114,16 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private IReadOnlyList<TrayMenuItem> BuildTrayMenu()
     {
+        if (_locked || _lockOnShow)
+        {
+            // Kilitliyken tepsiden yalnızca açma ve çıkış.
+            return new List<TrayMenuItem>
+            {
+                new("Zero File Commander'ı aç", ShowFromTray, IsDefault: true),
+                TrayMenuItem.Separator,
+                new("Çıkış", ExitApplication),
+            };
+        }
         var items = new List<TrayMenuItem>
         {
             new("Zero File Commander'ı aç", ShowFromTray, IsDefault: true),
@@ -2016,10 +2143,15 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void ShowFromTray()
     {
-        AppWindow.Show();
+        if (_lockOnShow && AppLock.IsEnabled) LockApp();
+        _lockOnShow = false;
+
+        AppWindow.Show(true);
         if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized } presenter) presenter.Restore();
         Activate();
-        _active.FocusList();
+        NativeWindow.BringToFront(Hwnd);
+        if (_locked) PinBox.Focus(FocusState.Programmatic);
+        else _active.FocusList();
     }
 
     private void HideToTray()
@@ -2032,6 +2164,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         SaveSession();
         _tray?.Show();
         Preview.Stop();
+        _lockOnShow = AppLock.IsEnabled && _settings.PinOnResume;
         AppWindow.Hide();
         if (!_trayHintShown)
         {

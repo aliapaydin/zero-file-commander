@@ -44,6 +44,9 @@ public sealed class AppSettings
     // ---- Arka plan ----
     /// <summary>Pencere kapatılınca uygulama sistem tepsisinde çalışmaya devam eder.</summary>
     public bool RunInBackground { get => Get(true); set => Set(value); }
+
+    /// <summary>PIN etkinse, tepsiden geri açarken de sorulsun.</summary>
+    public bool PinOnResume { get => Get(true); set => Set(value); }
     /// <summary>Simge durumuna küçültünce görev çubuğundan da gizlenip tepsiye iner.</summary>
     public bool MinimizeToTray { get => Get(false); set => Set(value); }
 

@@ -75,6 +75,11 @@ Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor
 - [x] "VS Code ile aç" (önizleme, sağ tık, komut paleti); kurulu değilse pasif
 - [x] Bağlantılar menüsü sadeleştirildi (tekrarlanan öğeler düzeltildi)
 
+## Ara sürüm · v0.8.2 ✅
+- [x] Sürücü çubuğunda seçim değişince paneller kaymıyor
+- [x] Tepsi simgesine tıklayınca pencere hemen ve öne gelerek açılıyor
+- [x] İsteğe bağlı 4 haneli uygulama PIN'i (Ayarlar → Güvenlik); tepsiden açarken de sorulabilir
+
 ## Bekleyenler
 - [ ] Önizle ve düzenle ekranı: sözdizimi renklendirme, kaydetme
 - [ ] Hızlı bakış kartında sabitleme (P), video sahne şeridi

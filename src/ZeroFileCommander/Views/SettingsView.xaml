@@ -24,6 +24,30 @@
                 </StackPanel>
             </StackPanel>
 
+            <!-- Güvenlik -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="Güvenlik" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <ToggleSwitch x:Name="PinToggle" Header="Uygulamayı 4 haneli PIN ile kilitle" Toggled="PinToggle_Toggled" />
+                <StackPanel x:Name="PinEditor" Visibility="Collapsed" Spacing="8" Padding="12" CornerRadius="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <PasswordBox x:Name="CurrentPin" Header="Mevcut PIN" MaxLength="4" InputScope="NumericPin" Width="160" HorizontalAlignment="Left" />
+                    <PasswordBox x:Name="NewPin" Header="Yeni PIN (4 rakam)" MaxLength="4" InputScope="NumericPin" Width="160" HorizontalAlignment="Left" />
+                    <PasswordBox x:Name="ConfirmPin" Header="Yeni PIN (tekrar)" MaxLength="4" InputScope="NumericPin" Width="160" HorizontalAlignment="Left" />
+                    <TextBlock x:Name="PinMessage" TextWrapping="Wrap" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="PinSave" Style="{StaticResource AccentButtonStyle}" Click="PinSave_Click" />
+                        <Button Content="Vazgeç" Click="PinCancel_Click" />
+                    </StackPanel>
+                </StackPanel>
+                <Button x:Name="PinChange" Content="PIN'i değiştir" Click="PinChange_Click" />
+                <CheckBox x:Name="PinResumeCheck" Content="Arka plandan (tepsiden) açarken de PIN iste" Checked="PinResume_Changed" Unchecked="PinResume_Changed" />
+                <TextBlock
+                    TextWrapping="Wrap"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="PIN bu bilgisayardaki uygulamanın açılışını korur; Windows kullanıcısından bağımsızdır. Unutursanız: Windows Ayarlar → Uygulamalar → Zero File Commander → Gelişmiş seçenekler → Sıfırla (tüm ayarlar sıfırlanır)." />
+            </StackPanel>
+
             <!-- Aktarımlar -->
             <StackPanel Spacing="10">
                 <TextBlock Text="Kopyalama ve taşıma" Style="{StaticResource SubtitleTextBlockStyle}" />

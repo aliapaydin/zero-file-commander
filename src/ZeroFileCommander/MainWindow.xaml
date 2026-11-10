@@ -419,5 +419,44 @@
 
         <!-- Komut paleti (Ctrl+K) -->
         <views:CommandPalette x:Name="Palette" Grid.RowSpan="6" />
+
+        <!-- Uygulama kilidi (PIN) -->
+        <Grid
+            x:Name="LockScreen"
+            Grid.RowSpan="6"
+            Visibility="Collapsed"
+            Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14" Width="280">
+                <Image Source="ms-appx:///Assets/Square44x44Logo.scale-200.png" Width="48" Height="48" />
+                <TextBlock Text="Zero File Commander kilitli" HorizontalAlignment="Center" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <TextBlock
+                    Text="Devam etmek için 4 haneli PIN'inizi girin."
+                    HorizontalAlignment="Center"
+                    TextAlignment="Center"
+                    TextWrapping="Wrap"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <StackPanel x:Name="PinDots" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="14" Margin="0,6,0,0" />
+                <PasswordBox
+                    x:Name="PinBox"
+                    MaxLength="4"
+                    InputScope="NumericPin"
+                    HorizontalAlignment="Center"
+                    Width="160"
+                    FontSize="20"
+                    PasswordChanged="PinBox_PasswordChanged"
+                    KeyDown="PinBox_KeyDown"
+                    AutomationProperties.Name="PIN" />
+                <TextBlock
+                    x:Name="PinError"
+                    HorizontalAlignment="Center"
+                    TextAlignment="Center"
+                    TextWrapping="Wrap"
+                    Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                <HyperlinkButton
+                    Content="Çıkış"
+                    HorizontalAlignment="Center"
+                    Click="LockExit_Click" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>
