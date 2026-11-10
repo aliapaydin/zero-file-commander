@@ -213,7 +213,8 @@ public sealed partial class MainWindow : Window, IPaneHost
     private async Task UpdatePreviewAsync(bool autoPlay)
     {
         if (!_settings.ShowPreviewPane) return;
-        var item = _active.FocusedItem;
+        // Seçim yoksa (boş alana tıklandı) önizleme de boş kalır.
+        var item = _active.SelectedItems.Count > 0 ? _active.FocusedItem : null;
         int request = ++_previewRequest;
         var resolved = item is { IsEntry: true } ? await ResolvePreviewItemAsync(item) : null;
         if (request != _previewRequest) return;
@@ -475,6 +476,18 @@ public sealed partial class MainWindow : Window, IPaneHost
                 case PaneCommand.AddToShelf when selection.Count > 0 && !pane.IsInArchive:
                     ShelfWindow.Add(selection.Select(i => i.FullPath));
                     break;
+                case PaneCommand.OpenInVsCode:
+                {
+                    if (!VsCode.IsInstalled)
+                    {
+                        await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "VS Code bulunamadı",
+                            "Visual Studio Code bu bilgisayarda kurulu görünmüyor. code.visualstudio.com adresinden kurabilirsiniz.");
+                        break;
+                    }
+                    string? codePath = target is null ? (pane.IsFileSystemFolder ? pane.CurrentPath : null) : await RealPathAsync(target);
+                    if (codePath is not null) VsCode.Open(codePath);
+                    break;
+                }
                 case PaneCommand.SendToWindow:
                     await SendToOtherWindowAsync();
                     break;
@@ -1290,6 +1303,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         ("app:sendtowindow", "Diğer pencereye kopyala", "\uE8A7", "Ctrl+Shift+→"),
         ("app:shelf", "Rafı aç/kapat", "\uE7B8", "Ctrl+Shift+S"),
         ("app:newconnection", "Yeni bağlantı (NAS, SFTP, FTP)", "\uE968", ""),
+        ("OpenInVsCode", "VS Code ile aç", "\uE943", ""),
         ("app:connections", "Bağlantıları yönet", "\uE713", ""),
         ("AddToShelf", "Rafa ekle", "\uE7B8", ""),
         ("app:settings", "Ayarlar", "\uE713", "Ctrl+,"),
@@ -1575,46 +1589,47 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void ConnectionStore_Changed(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(BuildConnectionsMenu);
 
+    private MenuBarItem? _connectionsMenu;
+
+    /// <summary>
+    /// Bağlantılar menüsü: yeni, yönet ve tek grup halinde kayıtlı bağlantılar + bulut klasörleri.
+    /// WinUI'de MenuBarItem.Items.Clear() açılır listeyi temizlemediği için menü her seferinde yeniden kurulur.
+    /// </summary>
     private void BuildConnectionsMenu()
     {
-        ConnectionsMenu.Items.Clear();
+        var menu = new MenuBarItem { Title = "Bağlantılar" };
+
         var add = new MenuFlyoutItem { Text = "Yeni bağlantı…", Icon = new FontIcon { Glyph = "\uE710" } };
         add.Click += async (_, _) => await NewConnectionAsync();
-        ConnectionsMenu.Items.Add(add);
+        menu.Items.Add(add);
         var manage = new MenuFlyoutItem { Text = "Bağlantıları yönet…", Icon = new FontIcon { Glyph = "\uE713" } };
         manage.Click += async (_, _) => await ManageConnectionsAsync();
-        ConnectionsMenu.Items.Add(manage);
+        menu.Items.Add(manage);
 
         var connections = ConnectionStore.All.OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-        if (connections.Count > 0) ConnectionsMenu.Items.Add(new MenuFlyoutSeparator());
+        var clouds = CloudFolders.Get();
+        if (connections.Count + clouds.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
         foreach (var connection in connections)
         {
             var item = new MenuFlyoutItem { Text = connection.Name, Icon = new FontIcon { Glyph = connection.Glyph } };
             ToolTipService.SetToolTip(item, connection.Kind == ConnectionKind.Smb ? connection.UncPath : connection.RootUri);
             item.Click += (_, _) => OpenConnection(connection);
-            ConnectionsMenu.Items.Add(item);
+            menu.Items.Add(item);
+        }
+        foreach (var cloud in clouds)
+        {
+            var item = new MenuFlyoutItem { Text = cloud.Name, Icon = new FontIcon { Glyph = "\uE753" } };
+            ToolTipService.SetToolTip(item, cloud.Path);
+            item.Click += (_, _) => { _active.Navigate(cloud.Path); _active.FocusList(); };
+            menu.Items.Add(item);
         }
 
-        var clouds = CloudFolders.Get();
-        if (clouds.Count > 0)
-        {
-            ConnectionsMenu.Items.Add(new MenuFlyoutSeparator());
-            foreach (var cloud in clouds)
-            {
-                var item = new MenuFlyoutItem { Text = cloud.Name, Icon = new FontIcon { Glyph = "\uE753" } };
-                item.Click += (_, _) => { _active.Navigate(cloud.Path); _active.FocusList(); };
-                ConnectionsMenu.Items.Add(item);
-            }
-        }
-
-        ConnectionsMenu.Items.Add(new MenuFlyoutSeparator());
-        var disconnect = new MenuFlyoutItem { Text = "Tüm uzak oturumları kapat", Icon = new FontIcon { Glyph = "\uE8CD" } };
-        disconnect.Click += (_, _) =>
-        {
-            RemoteSessions.CloseAll();
-            foreach (var pane in new[] { LeftPane, RightPane }.Where(p => p.IsRemote)) pane.Navigate(string.Empty);
-        };
-        ConnectionsMenu.Items.Add(disconnect);
+        var current = _connectionsMenu ?? ConnectionsMenu;
+        int index = MainMenu.Items.IndexOf(current);
+        if (index < 0) return;
+        MainMenu.Items.RemoveAt(index);
+        MainMenu.Items.Insert(index, menu);
+        _connectionsMenu = menu;
     }
 
     private void OpenConnection(SavedConnection connection)
@@ -1652,6 +1667,10 @@ public sealed partial class MainWindow : Window, IPaneHost
                 case ConnectionDialogs.ManageAction.Edit when connection is not null:
                     await NewConnectionAsync(connection, open: false);
                     continue; // listeye dön
+                case ConnectionDialogs.ManageAction.Disconnect:
+                    RemoteSessions.CloseAll();
+                    foreach (var pane in new[] { LeftPane, RightPane }.Where(p => p.IsRemote)) pane.Navigate(string.Empty);
+                    return;
                 case ConnectionDialogs.ManageAction.Delete when connection is not null:
                     if (await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, $"\"{connection.Name}\" silinsin mi?",
                             "Bağlantı ve kayıtlı parolası silinir. Sunucudaki dosyalara dokunulmaz.", "Sil"))
@@ -1749,6 +1768,14 @@ public sealed partial class MainWindow : Window, IPaneHost
             {
                 case PaneCommand.OpenWith when target is { IsDirectory: false, RemotePath: not null }:
                     ShellActions.OpenWith(await RemoteFiles.DownloadToTempAsync(connection, target.RemotePath, target.Name, CancellationToken.None));
+                    return true;
+                case PaneCommand.OpenInVsCode when target is { IsDirectory: false, RemotePath: not null }:
+                    VsCode.Open(await RemoteFiles.DownloadToTempAsync(connection, target.RemotePath, target.Name, CancellationToken.None));
+                    pane.ShowStatus("Salt okunur yerel kopya VS Code'da açıldı; değişiklikler sunucuya gönderilmez.");
+                    return true;
+                case PaneCommand.OpenInVsCode:
+                    await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Uzak klasör",
+                        "Sunucudaki klasörler VS Code'da açılamıyor. VS Code'un Remote - SSH eklentisini kullanabilir ya da klasörü önce indirebilirsiniz.");
                     return true;
                 case PaneCommand.Edit when target is { IsDirectory: false, RemotePath: not null }:
                     ShellActions.EditInNotepad(await RemoteFiles.DownloadToTempAsync(connection, target.RemotePath, target.Name, CancellationToken.None));

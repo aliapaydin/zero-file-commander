@@ -141,7 +141,7 @@ public static class ConnectionDialogs
     }
 
     /// <summary>Kayıtlı bağlantılar: aç, düzenle, sil. Seçilen işlem ve bağlantıyı döndürür.</summary>
-    public enum ManageAction { None, Open, Edit, Delete, New }
+    public enum ManageAction { None, Open, Edit, Delete, New, Disconnect }
 
     public static async Task<(ManageAction Action, SavedConnection? Connection)> ManageAsync(XamlRoot root, ElementTheme theme)
     {
@@ -195,8 +195,10 @@ public static class ConnectionDialogs
         }
 
         dialog = Dialogs.Create(root, theme, "Bağlantılar", new ScrollViewer { Content = list, MaxHeight = 480 }, "Yeni bağlantı…", "Kapat");
+        if (ConnectionStore.All.Any(c => c.IsRemote)) dialog.SecondaryButtonText = "Açık oturumları kapat";
         var shown = await dialog.ShowAsync();
         if (shown == ContentDialogResult.Primary) return (ManageAction.New, null);
+        if (shown == ContentDialogResult.Secondary) return (ManageAction.Disconnect, null);
         return result;
     }
 

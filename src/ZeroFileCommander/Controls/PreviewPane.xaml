@@ -89,11 +89,12 @@
                     Visibility="Collapsed"
                     HorizontalScrollMode="Disabled"
                     HorizontalScrollBarVisibility="Disabled">
-                    <TextBlock
+                    <RichTextBlock
                         x:Name="PreviewText"
                         Padding="12"
                         FontFamily="Cascadia Mono, Consolas"
                         FontSize="12"
+                        LineHeight="18"
                         TextWrapping="Wrap"
                         IsTextSelectionEnabled="True" />
                 </ScrollViewer>
@@ -170,6 +171,17 @@
             <StackPanel Grid.Row="3" Spacing="4">
                 <TextBlock x:Name="NameText" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" MaxLines="2" />
                 <TextBlock x:Name="KindText" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Button
+                    x:Name="VsCodeButton"
+                    Visibility="Collapsed"
+                    Margin="0,4,0,0"
+                    Padding="10,4"
+                    Click="VsCodeButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE943;" FontSize="13" />
+                        <TextBlock Text="VS Code ile aç" FontSize="12" />
+                    </StackPanel>
+                </Button>
                 <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4" Margin="0,6,0,0">
                     <TextBlock Text="Boyut" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                     <TextBlock x:Name="SizeText" Grid.Column="1" Style="{StaticResource CaptionTextBlockStyle}" />

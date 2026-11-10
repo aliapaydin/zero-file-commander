@@ -68,6 +68,13 @@ Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor
 - [x] SFTP / FTPS / FTP: gezinme, indirme/yükleme kuyrukta, yeniden adlandırma, klasör, silme; parolalar Windows Kimlik Bilgisi Kasası'nda, SFTP sunucu anahtarı ilk bağlantıda onaylanır
 - [x] Bulut klasörleri (OneDrive, Google Drive, Dropbox, iCloud, Box): "Bu bilgisayar"da; yalnızca çevrimiçi dosyalar işaretli ve önizleme onları kendiliğinden indirmez
 
+## Ara sürüm · v0.8.1 ✅
+- [x] Panelin herhangi bir yerine tıklamak onu aktif yapar; listenin boş alanına tıklamak seçimi ve önizlemeyi temizler
+- [x] Önizlemede sözdizimi renklendirme (Python, SQL, C#, JS/TS, HTML/XML, JSON, YAML, PowerShell, DAX, Power Query M ve diğerleri)
+- [x] Jupyter not defteri önizlemesi: hücreler, çalışma sırası, metin ve görsel çıktılar
+- [x] "VS Code ile aç" (önizleme, sağ tık, komut paleti); kurulu değilse pasif
+- [x] Bağlantılar menüsü sadeleştirildi (tekrarlanan öğeler düzeltildi)
+
 ## Bekleyenler
 - [ ] Önizle ve düzenle ekranı: sözdizimi renklendirme, kaydetme
 - [ ] Hızlı bakış kartında sabitleme (P), video sahne şeridi

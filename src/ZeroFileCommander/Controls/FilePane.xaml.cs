@@ -118,6 +118,8 @@ public sealed partial class FilePane : UserControl
             StopWatching();
             ConnectionStore.Changed -= ConnectionStore_Changed;
         };
+        // Panelin herhangi bir yerine tıklamak onu aktif yapar (öğeler tıklamayı işlese bile).
+        AddHandler(PointerPressedEvent, new PointerEventHandler(Pane_PointerPressed), handledEventsToo: true);
         Loaded += (_, _) =>
         {
             ConnectionStore.Changed -= ConnectionStore_Changed;
@@ -1105,6 +1107,41 @@ public sealed partial class FilePane : UserControl
 
     private void OnGotFocus(object sender, RoutedEventArgs e) => Activated?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>
+    /// Tıklama nereye geldi: satıra mı, listenin boş alanına mı, bir denetime mi?
+    /// Listenin boş alanına sol tık seçimi kaldırır; önizleme de boşalır.
+    /// </summary>
+    private void Pane_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        Activated?.Invoke(this, EventArgs.Empty);
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        for (var element = e.OriginalSource as DependencyObject; element is not null; element = VisualTreeHelper.GetParent(element))
+        {
+            switch (element)
+            {
+                case ListViewItem:
+                case Microsoft.UI.Xaml.Controls.Primitives.ScrollBar:
+                case Microsoft.UI.Xaml.Controls.Primitives.ButtonBase:
+                case TextBox:
+                case BreadcrumbBar:
+                case TabViewItem:
+                    return; // öğe ya da denetim: kendi işini yapsın
+            }
+            if (ReferenceEquals(element, FileList))
+            {
+                if (FileList.SelectedItems.Count > 0) FileList.SelectedItems.Clear();
+                FocusList();
+                return;
+            }
+            if (ReferenceEquals(element, this))
+            {
+                FocusList(); // durum çubuğu vb. boş alan: klavye bu panele gelsin
+                return;
+            }
+        }
+    }
+
     private void UpButton_Click(object sender, RoutedEventArgs e) => GoUp();
 
     private void List_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
@@ -1309,6 +1346,13 @@ public sealed partial class FilePane : UserControl
             if (item.Kind == FileKind.Text)
             {
                 menu.SecondaryCommands.Add(MenuButton("Düzenle", "", PaneCommand.Edit, "F4"));
+            }
+            if (single && VsCode.Suits(item) && !IsRemote)
+            {
+                // Kurulu değilse görünür ama pasif: kullanıcı özelliğin varlığını bilsin.
+                var vsCode = MenuButton("VS Code ile aç", "\uE943", PaneCommand.OpenInVsCode, enabled: VsCode.IsInstalled);
+                if (!VsCode.IsInstalled) ToolTipService.SetToolTip(vsCode, "Visual Studio Code bulunamadı");
+                menu.SecondaryCommands.Add(vsCode);
             }
             if (FileKinds.IsRunnable(item))
             {

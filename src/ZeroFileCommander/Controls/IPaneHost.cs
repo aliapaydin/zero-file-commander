@@ -26,6 +26,7 @@ public enum PaneCommand
     ExtractToOther,
     AddToShelf,
     SendToWindow,
+    OpenInVsCode,
 }
 
 /// <summary>Panelin komutları ve bırakılan dosyaları ilettiği ana pencere.</summary>

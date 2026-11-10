@@ -1,6 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.Data.Pdf;
 using Windows.Foundation;
 using Windows.Media.Core;
@@ -66,6 +68,7 @@ public sealed partial class PreviewPane : UserControl
         SizeText.Text = item.IsDirectory ? "—" : item.SizeText;
         DateText.Text = item.ModifiedText;
         ExtraText.Text = string.Empty;
+        UpdateVsCodeButton(item);
 
         // Yalnızca çevrimiçi bulut dosyası: seçmek dosyayı indirmesin, kullanıcı istesin.
         if (item.IsOnlineOnly && !string.Equals(_hydrateAllowed, item.FullPath, StringComparison.OrdinalIgnoreCase))
@@ -84,6 +87,15 @@ public sealed partial class PreviewPane : UserControl
                 await ShowTableAsync(item, version);
             else if (PowerBiInspector.CanInspect(item.FullPath, item.IsDirectory))
                 await ShowMetaAsync(item, version);
+            else if (!item.IsDirectory && extension.Equals(".ipynb", StringComparison.OrdinalIgnoreCase))
+                await ShowNotebookAsync(item, version);
+            else if (!item.IsDirectory && item.Kind is FileKind.Other && SyntaxHighlighter.IsSupported(item.Name))
+            {
+                var code = await FilePreview.ReadTextHeadAsync(item.FullPath);
+                if (version != _version) return;
+                if (code is null) ShowPlaceholder(item.Glyph, "Metin okunamadı");
+                else ShowCode(code, SyntaxHighlighter.LanguageFor(item.Name));
+            }
             else switch (item.Kind)
             {
                 case FileKind.Folder:
@@ -129,9 +141,7 @@ public sealed partial class PreviewPane : UserControl
                     var text = await FilePreview.ReadTextHeadAsync(item.FullPath);
                     if (version != _version) return;
                     if (text is null) { ShowPlaceholder(item.Glyph, "Metin okunamadı"); break; }
-                    PreviewText.Text = text;
-                    TextScroller.Visibility = Visibility.Visible;
-                    TextScroller.ChangeView(0, 0, null, disableAnimation: true);
+                    ShowCode(text, SyntaxHighlighter.LanguageFor(item.Name));
                     break;
 
                 default:
@@ -471,7 +481,8 @@ public sealed partial class PreviewPane : UserControl
         _renderedWidth = 0;
         ImageScroller.Visibility = Visibility.Collapsed;
         ImageScroller.ChangeView(0, 0, null, disableAnimation: true);
-        PreviewText.Text = string.Empty;
+        PreviewText.Blocks.Clear();
+        VsCodeButton.Visibility = Visibility.Collapsed;
         TextScroller.Visibility = Visibility.Collapsed;
         FolderScroller.Visibility = Visibility.Collapsed;
         FolderGrid.Children.Clear();
@@ -506,7 +517,7 @@ public sealed partial class PreviewPane : UserControl
             if (version != _version) return;
             if (text is not null)
             {
-                PreviewText.Text = text;
+                ShowCode(text, null);
                 TextScroller.Visibility = Visibility.Visible;
             }
             else ShowPlaceholder("\uE80A", "Tablo okunamadı: " + ex.Message);
@@ -728,6 +739,214 @@ public sealed partial class PreviewPane : UserControl
             };
         };
         return expander;
+    }
+
+    // ---------------------------------------------------------------- Kod (sözdizimi renkleri)
+
+    private void ShowCode(string text, string? language)
+    {
+        PreviewText.Blocks.Clear();
+        PreviewText.Blocks.Add(BuildCodeParagraph(text, language));
+        TextScroller.Visibility = Visibility.Visible;
+        TextScroller.ChangeView(0, 0, null, disableAnimation: true);
+        if (language is not null) KindText.Text = $"{language} kodu · {_current?.Extension}";
+    }
+
+    private Paragraph BuildCodeParagraph(string text, string? language)
+    {
+        var paragraph = new Paragraph();
+        var palette = Palette(ActualTheme);
+        // Aynı türden ardışık belirteçleri birleştir: daha az Run, daha hızlı çizim.
+        TokenKind? pendingKind = null;
+        var pending = new System.Text.StringBuilder();
+        void Flush()
+        {
+            if (pending.Length == 0 || pendingKind is null) return;
+            var run = new Run { Text = pending.ToString() };
+            if (palette.TryGetValue(pendingKind.Value, out var brush)) run.Foreground = brush;
+            if (pendingKind is TokenKind.Heading) run.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+            if (pendingKind is TokenKind.Comment) run.FontStyle = Windows.UI.Text.FontStyle.Italic;
+            paragraph.Inlines.Add(run);
+            pending.Clear();
+        }
+        foreach (var token in SyntaxHighlighter.Tokenize(text, language))
+        {
+            if (token.Kind != pendingKind) Flush();
+            pendingKind = token.Kind;
+            pending.Append(token.Text);
+        }
+        Flush();
+        return paragraph;
+    }
+
+    private static Dictionary<TokenKind, Brush>? _darkPalette, _lightPalette;
+
+    /// <summary>VS Code Dark+/Light+ renklerine yakın palet.</summary>
+    private static Dictionary<TokenKind, Brush> Palette(ElementTheme theme)
+    {
+        static SolidColorBrush B(uint rgb) => new(Windows.UI.Color.FromArgb(255, (byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb));
+        if (theme == ElementTheme.Light)
+        {
+            return _lightPalette ??= new()
+            {
+                [TokenKind.Comment] = B(0x008000), [TokenKind.String] = B(0xA31515), [TokenKind.Keyword] = B(0x0000FF),
+                [TokenKind.Control] = B(0xAF00DB), [TokenKind.Number] = B(0x098658), [TokenKind.Type] = B(0x267F99),
+                [TokenKind.Function] = B(0x795E26), [TokenKind.Tag] = B(0x800000), [TokenKind.Attribute] = B(0xE50000),
+                [TokenKind.Property] = B(0x0451A5), [TokenKind.Heading] = B(0x0000FF),
+            };
+        }
+        return _darkPalette ??= new()
+        {
+            [TokenKind.Comment] = B(0x6A9955), [TokenKind.String] = B(0xCE9178), [TokenKind.Keyword] = B(0x569CD6),
+            [TokenKind.Control] = B(0xC586C0), [TokenKind.Number] = B(0xB5CEA8), [TokenKind.Type] = B(0x4EC9B0),
+            [TokenKind.Function] = B(0xDCDCAA), [TokenKind.Tag] = B(0x569CD6), [TokenKind.Attribute] = B(0x9CDCFE),
+            [TokenKind.Property] = B(0x9CDCFE), [TokenKind.Heading] = B(0x569CD6),
+        };
+    }
+
+    // ---------------------------------------------------------------- Jupyter not defteri
+
+    private async Task ShowNotebookAsync(FileItem item, int version)
+    {
+        Notebook notebook;
+        try
+        {
+            notebook = await NotebookReader.ReadAsync(item.FullPath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (version != _version) return;
+            CrashLog.Write("Not defteri önizleme", ex);
+            var raw = await FilePreview.ReadTextHeadAsync(item.FullPath);
+            if (version != _version) return;
+            if (raw is null) ShowPlaceholder(item.Glyph, "Not defteri okunamadı");
+            else ShowCode(raw, "JSON");
+            return;
+        }
+        if (version != _version) return;
+
+        var language = SyntaxHighlighter.LanguageFor("x." + notebook.Language switch
+        {
+            "python" or "python3" or "pyspark" => "py",
+            "r" => "r",
+            "sql" or "sparksql" => "sql",
+            "scala" => "scala",
+            "csharp" or "c#" or ".net-csharp" => "cs",
+            "javascript" or "typescript" => "js",
+            "powershell" => "ps1",
+            _ => "py",
+        });
+        int codeCells = notebook.Cells.Count(c => c.IsCode);
+        KindText.Text = $"Jupyter not defteri · {notebook.KernelName ?? notebook.Language}";
+        ExtraText.Text = $"{notebook.TotalCells} hücre · {codeCells} kod" + (notebook.TotalCells > notebook.Cells.Count ? $" · ilk {notebook.Cells.Count} gösteriliyor" : string.Empty);
+
+        var mono = new FontFamily("Cascadia Mono, Consolas");
+        var codeBackground = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"];
+        var border = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"];
+        var secondary = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+        var critical = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+
+        foreach (var cell in notebook.Cells)
+        {
+            if (cell.Source.Length == 0 && cell.Outputs.Count == 0) continue;
+            if (cell.IsMarkdown)
+            {
+                var markdown = new RichTextBlock { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true, FontSize = 13 };
+                markdown.Blocks.Add(BuildCodeParagraph(cell.Source, "Markdown"));
+                MetaStack.Children.Add(markdown);
+                continue;
+            }
+            if (!cell.IsCode)
+            {
+                MetaStack.Children.Add(new TextBlock { Text = cell.Source, FontFamily = mono, FontSize = 12, TextWrapping = TextWrapping.Wrap, Foreground = secondary });
+                continue;
+            }
+
+            var block = new StackPanel { Spacing = 4 };
+            block.Children.Add(new TextBlock
+            {
+                Text = cell.ExecutionCount is { } n ? $"[{n}]" : "[ ]",
+                FontFamily = mono,
+                FontSize = 11,
+                Foreground = secondary,
+            });
+            var code = new RichTextBlock { FontFamily = mono, FontSize = 12, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
+            code.Blocks.Add(BuildCodeParagraph(cell.Source, language));
+            block.Children.Add(new Border
+            {
+                Background = codeBackground,
+                BorderBrush = border,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(10, 8, 10, 8),
+                Child = code,
+            });
+            foreach (var output in cell.Outputs)
+            {
+                if (output.PngBase64 is { } png)
+                {
+                    var image = new Image { Stretch = Stretch.Uniform, MaxHeight = 360, HorizontalAlignment = HorizontalAlignment.Left };
+                    try
+                    {
+                        var bytes = Convert.FromBase64String(png);
+                        var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                        using var memory = new MemoryStream(bytes);
+                        await bitmap.SetSourceAsync(memory.AsRandomAccessStream());
+                        if (version != _version) return;
+                        image.Source = bitmap;
+                        block.Children.Add(image);
+                    }
+                    catch (Exception ex) when (ex is FormatException or IOException or System.Runtime.InteropServices.COMException)
+                    {
+                        // bozuk görsel: atla
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(output.Text))
+                {
+                    block.Children.Add(new TextBlock
+                    {
+                        Text = output.Text,
+                        FontFamily = mono,
+                        FontSize = 11.5,
+                        TextWrapping = TextWrapping.Wrap,
+                        IsTextSelectionEnabled = true,
+                        Foreground = output.IsError ? critical : secondary,
+                        Margin = new Thickness(10, 0, 0, 0),
+                    });
+                }
+            }
+            MetaStack.Children.Add(block);
+        }
+
+        if (MetaStack.Children.Count == 0)
+        {
+            ShowPlaceholder(item.Glyph, "Not defteri boş");
+            return;
+        }
+        MetaScroller.Visibility = Visibility.Visible;
+        MetaScroller.ChangeView(0, 0, null, disableAnimation: true);
+    }
+
+    // ---------------------------------------------------------------- VS Code
+
+    private void UpdateVsCodeButton(FileItem item)
+    {
+        if (!VsCode.Suits(item) || item.IsRemote)
+        {
+            VsCodeButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+        bool installed = VsCode.IsInstalled;
+        VsCodeButton.Visibility = Visibility.Visible;
+        VsCodeButton.IsEnabled = installed;
+        ToolTipService.SetToolTip(VsCodeButton, installed
+            ? (item.IsDirectory ? "Klasörü VS Code'da aç" : "Dosyayı VS Code'da aç")
+            : "Visual Studio Code bu bilgisayarda bulunamadı");
+    }
+
+    private void VsCodeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_current is { } item) VsCode.Open(item.FullPath);
     }
 
     private string? _hydrateAllowed;
