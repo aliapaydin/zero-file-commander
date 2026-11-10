@@ -2228,7 +2228,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         Clipboard.ContentChanged -= Clipboard_ContentChanged;
         _taskbar.Set(null);
         RemoteSessions.CloseAll();
-        RemoteFiles.CleanTemp();
+        TempFiles.CleanOnExit();
         _tray?.Dispose();
         Preview.Stop();
         _downloadsWindow?.Close();

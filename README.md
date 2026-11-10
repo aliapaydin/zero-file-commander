@@ -213,6 +213,7 @@ src/ZeroFileCommander/   WinUI 3 uygulaması
 - Uygulama hiçbir veriyi dışarı göndermez; telemetri yoktur. İnternete yalnızca sen bir sunucuya bağlandığında ya da indirme başlattığında çıkar.
 - Parolalar Windows Kimlik Bilgisi Kasası'nda, PIN ise geri çözülemeyen bir özet olarak saklanır.
 - Silme işlemleri varsayılan olarak **Geri Dönüşüm Kutusu**'na gider. Kalıcı silme yalnızca Shift ile istenip kırmızı onay kutusu onaylanırsa yapılır.
+- Ayrıntılı gizlilik politikası: [PRIVACY.md](PRIVACY.md)
 - Bir güvenlik açığı bulursan lütfen herkese açık issue yerine [SECURITY.md](SECURITY.md)'deki yolu izle.
 
 ## 🗺️ Yol haritası

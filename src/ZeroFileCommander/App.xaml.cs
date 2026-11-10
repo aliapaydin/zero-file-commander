@@ -30,6 +30,7 @@ public partial class App : Application
     {
         // ANSI/OEM kod sayfaları (Türkçe CSV'ler, eski ZIP adları) için.
         System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        Services.TempFiles.CleanStale();
         _window = new MainWindow();
         _window.Activate();
     }
