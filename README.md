@@ -9,6 +9,12 @@
   <sub>Klasik çift panelli dosya yöneticilerinin gücü, modern Windows 11 tadında.</sub>
 </p>
 
+<p align="center">
+  <a href="https://github.com/aliapaydin/zero-file-commander/actions/workflows/build.yml"><img src="https://github.com/aliapaydin/zero-file-commander/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1f6fd6" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-1f6fd6" alt="Windows 10 | 11">
+</p>
+
 ---
 
 > **Status:** early development (v0.1). The app runs and browses folders; most of the features below are on the [roadmap](docs/ROADMAP.md).
@@ -51,6 +57,11 @@ Zero File Commander, Total Commander'dan esinlenen modern bir Windows dosya yön
 
 Detaylar için [docs/ROADMAP.md](docs/ROADMAP.md) ve [docs/DESIGN.md](docs/DESIGN.md) dosyalarına bak.
 
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+*Katkılar açık; İngilizce ya da Türkçe yazabilirsin.*
+
 ## License
 
-Not decided yet. All rights reserved until a license is added.
+[MIT](LICENSE) © 2026 Ali Apaydın

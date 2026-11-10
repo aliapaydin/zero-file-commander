@@ -1,0 +1,20 @@
+name: Feature request / Özellik isteği
+description: Suggest an idea for Zero File Commander.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do? / Ne yapmak istiyorsun?
+      description: Describe the workflow or problem, not only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed solution / Önerilen çözüm
+  - type: textarea
+    id: refs
+    attributes:
+      label: Similar tools / Benzer araçlar
+      description: e.g. how Total Commander, Directory Opus or Files handle it.
