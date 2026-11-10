@@ -426,6 +426,16 @@ public sealed partial class FilePane : UserControl
         }
         if (Host is null) return;
         if (!sameFolder) StatusText.Text = $"{connection.Name}: bağlanılıyor…";
+        // Açılışta sekme geri yüklenirken pencere henüz hazır değilse diyaloglar için bekle.
+        if (XamlRoot is null)
+        {
+            var loaded = new TaskCompletionSource();
+            void OnLoaded(object s, RoutedEventArgs e) { Loaded -= OnLoaded; loaded.TrySetResult(); }
+            Loaded += OnLoaded;
+            if (XamlRoot is null) await loaded.Task;
+            else Loaded -= OnLoaded;
+            if (version != _remoteVersion) return;
+        }
         try
         {
             var session = await Host.ConnectRemoteAsync(connection);
