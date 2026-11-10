@@ -105,7 +105,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private void Pane_SelectionChanged(object? sender, EventArgs e)
     {
-        if (sender != _active) return;
+        if (!ReferenceEquals(sender, _active)) return;
         UpdateRibbon();
         if (_settings.ShowPreviewPane)
         {

@@ -17,9 +17,19 @@
 
 ---
 
-> **Status:** early development (v0.1). The app runs and browses folders; most of the features below are on the [roadmap](docs/ROADMAP.md).
+> **Status:** early development (v0.2). See the [roadmap](docs/ROADMAP.md) for what's done and what's next.
 
-## Highlights (planned)
+## What works today (v0.2)
+
+- **Dual pane, keyboard first:** F2–F8, Tab, Space, and Ctrl+C/X/V that work with File Explorer
+- **Drag & drop:** between panes (move; hold Ctrl to copy), and in or out of the app
+- **Custom context menu** in the Windows 11 style, a menu bar, and a ribbon that changes with the selection
+- **Preview pane:** images, PDFs, text/code, music (quick play), video; hover quick look for images, videos and PDFs
+- **Folder tree**, light/dark/system theme
+- **System tray:** keeps running in the background after closing (optional), with a tray menu
+- **Download manager** (off by default): its own window, pause/resume, taskbar progress, and a notification box you can place in any corner
+
+## Planned
 
 - **Dual pane, keyboard first:** F3–F8, Tab to switch panes, marking, and a command palette (Ctrl+K)
 - **Multi-monitor transfers:** drag between windows on different screens, plus an edge shelf and a "send to other window" shortcut

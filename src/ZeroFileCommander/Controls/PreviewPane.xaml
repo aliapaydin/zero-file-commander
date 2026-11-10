@@ -67,7 +67,7 @@
                         MaxWidth="220"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
-                <ProgressRing x:Name="Loading" Width="28" Height="28" IsActive="False" />
+                <ProgressRing x:Name="LoadingRing" Width="28" Height="28" IsActive="False" />
             </Grid>
 
             <StackPanel Grid.Row="2" Spacing="4">

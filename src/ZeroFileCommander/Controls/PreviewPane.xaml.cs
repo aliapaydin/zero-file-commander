@@ -51,7 +51,7 @@ public sealed partial class PreviewPane : UserControl
         DateText.Text = item.ModifiedText;
         ExtraText.Text = string.Empty;
 
-        Loading.IsActive = true;
+        LoadingRing.IsActive = true;
         try
         {
             switch (item.Kind)
@@ -125,7 +125,7 @@ public sealed partial class PreviewPane : UserControl
         }
         finally
         {
-            if (version == _version) Loading.IsActive = false;
+            if (version == _version) LoadingRing.IsActive = false;
         }
     }
 
@@ -155,7 +155,7 @@ public sealed partial class PreviewPane : UserControl
         PreviewText.Text = string.Empty;
         TextScroller.Visibility = Visibility.Collapsed;
         Placeholder.Visibility = Visibility.Collapsed;
-        Loading.IsActive = false;
+        LoadingRing.IsActive = false;
     }
 
     private void ShowPlaceholder(string glyph, string text)

@@ -10,26 +10,43 @@ Sürümler kabaca sıralı. Her madde mockup'taki bir ekrana karşılık geliyor
 - [x] Kopyala, taşı ve Geri Dönüşüm Kutusu'na silme Windows kabuğu üzerinden
 - [x] GitHub Actions'ta x64 ve ARM64 derlemesi
 
-## v0.2: Gerçek bir commander
+## v0.2: Etkileşim ve kabuk ✅
+- [x] Kendi tasarımımız olan sağ tık menüsü (Windows 11 tarzı, simge satırı ve bağlama göre değişen komutlar)
+- [x] Kes, kopyala, yapıştır: Windows panosu üzerinden, Dosya Gezgini ile iki yönlü
+- [x] Sürükle-bırak: paneller arasında taşı (Ctrl basılıyken kopyala); uygulamanın dışına ve dışından da çalışır
+- [x] Uygulama menüsü: Dosya, Düzen, İşlemler, Görünüm, Pencere, Yardım
+- [x] Seçime göre değişen şerit (ribbon) ve tür etiketi
+- [x] İsteğe bağlı klasör ağacı ve önizleme paneli
+- [x] Önizleme: görsel, PDF (ilk sayfa), metin/kod, müzik (hızlı çal), video
+- [x] Üzerine gelince hızlı bakış: görsel, video, PDF; gecikmesi ayarlanabiliyor
+- [x] Aydınlık / karanlık / sisteme göre tema
+- [x] Sistem tepsisi: kapatınca arka planda çalışma (varsayılan açık), tepsiye küçültme, tepsi menüsü
+- [x] İndirme yöneticisi (varsayılan kapalı): ayrı pencere, duraklat/devam, alt çubukta takip, görev çubuğunda ilerleme
+- [x] Konumu ayarlanabilen modern bildirim kutusu
+- [x] Ayarlar, Hakkında, Klavye kısayolları, Özellikler pencereleri
+
+## v0.2.x: Commander temelleri
 - [ ] Sekmeler (Ctrl+T, Ctrl+W, sekmeyi diğer panele sürükleme)
 - [ ] Sürücü çipleri ve doluluk göstergesi, tıklanabilir yol çubuğu (breadcrumb)
-- [ ] İşaretleme: Insert/Space, renkli işaretli dosyalar, işaretli toplam boyut
+- [ ] Insert/Space ile işaretleme, renkli işaretli dosyalar
 - [ ] Sıralama (ad, uzantı, boyut, tarih) ve sütun genişliği
 - [ ] Gerçek dosya simgeleri (shell icon), klasör izleme (FileSystemWatcher)
-- [ ] Yeniden adlandırma (F2 / Shift+F6), satır içi düzenleme
+- [ ] Bir klasörün üzerine bırakınca o klasöre taşıma
+- [ ] Windows'un kendi sağ tık menüsünü "Daha fazla seçenek" altında gösterme
+- [ ] Tarayıcı eklentisi veya `zfc-download:` protokolü ile indirmeleri devralma
+- [ ] Tek örnek (single instance): ikinci açılış mevcut pencereyi öne getirsin
 - [ ] Ayarların kalıcı olması (son klasörler, panel başına görünüm)
 
 ## v0.3: Önizleme
-- [ ] Önizleme paneli (F3 / Ctrl+Q): görsel, metin/kod, CSV, PDF, video
 - [ ] Önizle ve düzenle ekranı: bölünmüş görünüm, sözdizimi renklendirme, kaydetme
-- [ ] Hızlı bakış kartı: gecikme ayarı, Space ile tam ekran, sabitleme (P)
+- [ ] CSV/Excel tablo önizlemesi, PDF sayfaları arasında gezinme
+- [ ] Hızlı bakış kartında sabitleme (P) ve Space ile tam ekran
 - [ ] Video sahne şeridi
 
 ## v0.4: Görünümler ve tema
 - [ ] Detay, Liste, Simgeler ve Galeri modları, panel başına ayrı mod
 - [ ] Ctrl + fare tekeri ile boyutlandırma (5 kademe)
 - [ ] Küçük resim önbelleği (Windows thumbnail cache ve kendi disk önbelleğimiz)
-- [ ] Aydınlık / karanlık / sistem teması
 
 ## v0.5: Transfer motoru
 - [ ] Kendi transfer kuyruğumuz: duraklat/devam, hız, kalan süre, öncelik
