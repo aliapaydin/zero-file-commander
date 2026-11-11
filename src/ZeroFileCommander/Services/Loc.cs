@@ -183,7 +183,7 @@ public static class Loc
         if (node is ScrollViewer { Content: { } scrollContent }) Walk(scrollContent, visited);
     }
 
-    private static void TranslateItems(ItemCollection items, HashSet<object> visited)
+    private static void TranslateItems(IList<object> items, HashSet<object> visited)
     {
         for (int i = 0; i < items.Count; i++)
         {
