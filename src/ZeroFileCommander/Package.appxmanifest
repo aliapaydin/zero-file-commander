@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Identity Name ve Publisher değerleri Partner Center'da isim rezerve edildikten sonra
-  "Product identity" sayfasındaki değerlerle değiştirilecek (bkz. docs/PUBLISHING.md).
+  Identity değerleri Partner Center → Product identity ile birebir aynı olmalı (Store başka değeri reddeder).
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -10,13 +9,13 @@
   IgnorableNamespaces="uap rescap">
 
   <Identity
-    Name="ZeroFileCommander"
-    Publisher="CN=ZeroFileCommander-Dev"
+    Name="AliApaydin.ZeroFileCommander"
+    Publisher="CN=BA57EB18-640B-433D-88C6-EB1D10E9A905"
     Version="0.8.2.0" />
 
   <Properties>
     <DisplayName>Zero File Commander</DisplayName>
-    <PublisherDisplayName>Ali Apaydın</PublisherDisplayName>
+    <PublisherDisplayName>Ali Apaydin</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
