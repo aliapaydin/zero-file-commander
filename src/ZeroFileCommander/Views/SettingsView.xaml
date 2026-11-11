@@ -10,6 +10,17 @@
             <!-- Görünüm -->
             <StackPanel Spacing="10">
                 <TextBlock Text="Görünüm" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <ComboBox x:Name="LanguageChoice" Header="Dil" MinWidth="220" SelectionChanged="LanguageChoice_SelectionChanged">
+                    <x:String>Sistem dili</x:String>
+                    <x:String>Türkçe</x:String>
+                    <x:String>English</x:String>
+                </ComboBox>
+                <InfoBar x:Name="LanguageRestartBar" IsOpen="False" IsClosable="False" Severity="Informational"
+                         Message="Dil değişikliği uygulamayı yeniden başlatınca uygulanır.">
+                    <InfoBar.ActionButton>
+                        <Button x:Name="RestartButton" Content="Yeniden başlat" Click="RestartButton_Click" />
+                    </InfoBar.ActionButton>
+                </InfoBar>
                 <RadioButtons x:Name="ThemeChoice" Header="Tema" SelectionChanged="ThemeChoice_SelectionChanged" MaxColumns="3">
                     <x:String>Sisteme göre</x:String>
                     <x:String>Aydınlık</x:String>

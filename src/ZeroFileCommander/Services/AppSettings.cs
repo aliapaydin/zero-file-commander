@@ -45,6 +45,9 @@ public sealed class AppSettings
     /// <summary>Pencere kapatılınca uygulama sistem tepsisinde çalışmaya devam eder.</summary>
     public bool RunInBackground { get => Get(true); set => Set(value); }
 
+    /// <summary>Arayüz dili: "" (Windows'a göre), "tr" ya da "en". Yeniden başlatınca uygulanır.</summary>
+    public string UiLanguage { get => Get(string.Empty); set => Set(value); }
+
     /// <summary>PIN etkinse, tepsiden geri açarken de sorulsun.</summary>
     public bool PinOnResume { get => Get(true); set => Set(value); }
     /// <summary>Simge durumuna küçültünce görev çubuğundan da gizlenip tepsiye iner.</summary>

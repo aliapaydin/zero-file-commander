@@ -13,7 +13,7 @@ public static class NewMenu
 
         var folder = new MenuFlyoutItem
         {
-            Text = "Klasör",
+            Text = Loc.T("Klasör"),
             Icon = new FontIcon { Glyph = "" },
             KeyboardAcceleratorTextOverride = "F7",
         };

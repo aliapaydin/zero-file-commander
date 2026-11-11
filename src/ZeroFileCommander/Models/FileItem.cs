@@ -1,3 +1,4 @@
+using ZeroFileCommander.Services;
 using System.ComponentModel;
 using Microsoft.UI.Xaml.Media;
 
@@ -64,7 +65,7 @@ public sealed class FileItem : INotifyPropertyChanged
     public string SizeText =>
         IsParent ? string.Empty :
         IsDrive ? string.Empty :
-        IsDirectory ? "<KLS>" :
+        IsDirectory ? Loc.T("<KLS>") :
         FormatSize(Size ?? 0);
 
     public string ModifiedText => Modified?.ToString("dd.MM.yyyy HH:mm") ?? string.Empty;

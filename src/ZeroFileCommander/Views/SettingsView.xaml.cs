@@ -19,6 +19,7 @@ public sealed partial class SettingsView : UserControl
     {
         _ownerHwnd = ownerHwnd;
         InitializeComponent();
+        Loc.Apply(this); // XAML metinleri seçili dile
 
         LoadValues();
         _loading = false;
@@ -32,6 +33,7 @@ public sealed partial class SettingsView : UserControl
         GitToggle.IsOn = _settings.ShowGitStatus;
         HoverDelay.Value = _settings.HoverDelayMs;
         HoverDelayText.Text = $"{_settings.HoverDelayMs} ms";
+        LanguageChoice.SelectedIndex = _settings.UiLanguage switch { "tr" => 1, "en" => 2, _ => 0 };
         PinToggle.IsOn = AppLock.IsEnabled;
         PinResumeCheck.IsChecked = _settings.PinOnResume;
         UpdatePinControls();
@@ -52,14 +54,14 @@ public sealed partial class SettingsView : UserControl
     private void ResetLayout_Click(object sender, RoutedEventArgs e)
     {
         _settings.ResetLayout();
-        ResetStatus.Text = "Yerleşim varsayılana döndü.";
+        ResetStatus.Text = Loc.T("Yerleşim varsayılana döndü.");
     }
 
     private void ResetAll_Click(object sender, RoutedEventArgs e)
     {
         _settings.ResetAll();
         LoadValues();
-        ResetStatus.Text = "Tüm ayarlar varsayılana döndü.";
+        ResetStatus.Text = Loc.T("Tüm ayarlar varsayılana döndü.");
     }
 
     private void ThemeChoice_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -85,6 +87,24 @@ public sealed partial class SettingsView : UserControl
         if (!_loading) _settings.HoverDelayMs = (int)e.NewValue;
     }
 
+    // ---------------------------------------------------------------- Dil
+
+    private void LanguageChoice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || LanguageChoice.SelectedIndex < 0) return;
+        _settings.UiLanguage = LanguageChoice.SelectedIndex switch { 1 => "tr", 2 => "en", _ => string.Empty };
+        // Seçilen dil şu an çalışan dilden farklıysa yeniden başlatmayı öner.
+        string wanted = LanguageChoice.SelectedIndex switch
+        {
+            1 => "tr",
+            2 => "en",
+            _ => System.Globalization.CultureInfo.InstalledUICulture.TwoLetterISOLanguageName == "tr" ? "tr" : "en",
+        };
+        LanguageRestartBar.IsOpen = wanted != Loc.Language;
+    }
+
+    private void RestartButton_Click(object sender, RoutedEventArgs e) => MainWindow.Primary?.RestartApplication();
+
     // ---------------------------------------------------------------- PIN
 
     private enum PinMode { None, Enable, Change, Disable }
@@ -101,9 +121,9 @@ public sealed partial class SettingsView : UserControl
         NewPin.Visibility = ConfirmPin.Visibility = _pinMode is PinMode.Enable or PinMode.Change ? Visibility.Visible : Visibility.Collapsed;
         PinSave.Content = _pinMode switch
         {
-            PinMode.Disable => "Kilidi kaldır",
-            PinMode.Change => "PIN'i değiştir",
-            _ => "PIN'i kaydet",
+            PinMode.Disable => Loc.T("Kilidi kaldır"),
+            PinMode.Change => Loc.T("PIN'i değiştir"),
+            _ => Loc.T("PIN'i kaydet"),
         };
     }
 
@@ -145,13 +165,13 @@ public sealed partial class SettingsView : UserControl
         {
             if (AppLock.Cooldown is { } wait)
             {
-                PinMessage.Text = $"Çok fazla yanlış deneme. {Math.Ceiling(wait.TotalSeconds)} sn bekleyin.";
+                PinMessage.Text = Loc.F("Çok fazla yanlış deneme. {0} sn bekleyin.", Math.Ceiling(wait.TotalSeconds));
                 return;
             }
             var current = CurrentPin.Password;
             if (!await Task.Run(() => AppLock.Verify(current)))
             {
-                PinMessage.Text = "Mevcut PIN yanlış.";
+                PinMessage.Text = Loc.T("Mevcut PIN yanlış.");
                 CurrentPin.Password = string.Empty;
                 return;
             }
@@ -165,12 +185,12 @@ public sealed partial class SettingsView : UserControl
         {
             if (!AppLock.IsValidPin(NewPin.Password))
             {
-                PinMessage.Text = "PIN tam olarak 4 rakam olmalı.";
+                PinMessage.Text = Loc.T("PIN tam olarak 4 rakam olmalı.");
                 return;
             }
             if (NewPin.Password != ConfirmPin.Password)
             {
-                PinMessage.Text = "İki PIN aynı değil.";
+                PinMessage.Text = Loc.T("İki PIN aynı değil.");
                 ConfirmPin.Password = string.Empty;
                 return;
             }
@@ -239,5 +259,5 @@ public sealed partial class SettingsView : UserControl
     }
 
     private void TestNotification_Click(object sender, RoutedEventArgs e) =>
-        Notifier.Show("Bildirimler burada görünecek", "Konumu bu ayardan değiştirebilirsin.", "");
+        Notifier.Show(Loc.T("Bildirimler burada görünecek"), Loc.T("Konumu bu ayardan değiştirebilirsin."), "");
 }

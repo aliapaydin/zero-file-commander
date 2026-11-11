@@ -75,8 +75,8 @@ public static class ShellNew
         }
 
         if (!result.Any(e => e.Extension.Equals(".txt", StringComparison.OrdinalIgnoreCase)))
-            result.Add(new ShellNewEntry(".txt", "Metin Belgesi", "Yeni Metin Belgesi", null, null));
-        result.Add(new ShellNewEntry(".md", "Markdown belgesi", "Yeni Markdown Belgesi", null, Encoding.UTF8.GetBytes("# Başlık\n\n")));
+            result.Add(new ShellNewEntry(".txt", Loc.T("Metin Belgesi"), Loc.T("Yeni Metin Belgesi"), null, null));
+        result.Add(new ShellNewEntry(".md", Loc.T("Markdown belgesi"), Loc.T("Yeni Markdown Belgesi"), null, Encoding.UTF8.GetBytes(Loc.T("# Başlık\n\n"))));
 
         // Önce Office ve metin, sonra diğerleri.
         static int Rank(string ext) => ext.ToLowerInvariant() switch
@@ -118,7 +118,7 @@ public static class ShellNew
                 if (!ext.Equals(".docx", StringComparison.OrdinalIgnoreCase)) return null;
             }
 
-            string display = ext.TrimStart('.').ToUpperInvariant() + " dosyası";
+            string display = ext.TrimStart('.').ToUpperInvariant() + Loc.T(" dosyası");
             if (!string.IsNullOrEmpty(progId))
             {
                 using var progKey = Registry.ClassesRoot.OpenSubKey(progId);
@@ -127,7 +127,7 @@ public static class ShellNew
             }
 
             var itemName = ResolveIndirect(shellNew.GetValue("ItemName") as string);
-            string baseName = !string.IsNullOrWhiteSpace(itemName) ? itemName : $"Yeni {display}";
+            string baseName = !string.IsNullOrWhiteSpace(itemName) ? itemName : Loc.F("Yeni {0}", display);
             return new ShellNewEntry(ext, display, baseName, template, data);
         }
     }

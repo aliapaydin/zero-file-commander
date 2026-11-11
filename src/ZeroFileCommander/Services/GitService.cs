@@ -194,7 +194,7 @@ public static class GitService
         }
         if (header.StartsWith("HEAD (no branch)", StringComparison.Ordinal))
         {
-            info.Branch = "ayrık HEAD";
+            info.Branch = Loc.T("ayrık HEAD");
             return;
         }
         string branch = header;

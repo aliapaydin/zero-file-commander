@@ -16,6 +16,7 @@ public sealed partial class DownloadsWindow : Window
     public DownloadsWindow()
     {
         InitializeComponent();
+        Loc.Apply(this); // XAML metinleri seçili dile
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarArea);
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
@@ -54,7 +55,7 @@ public sealed partial class DownloadsWindow : Window
         int total = Manager.Items.Count;
         int active = Manager.ActiveCount;
         EmptyText.Visibility = total == 0 ? Visibility.Visible : Visibility.Collapsed;
-        SummaryText.Text = total == 0 ? string.Empty : active > 0 ? $"{active} indirme sürüyor · toplam {total}" : $"{total} indirme";
+        SummaryText.Text = total == 0 ? string.Empty : active > 0 ? Loc.F("{0} indirme sürüyor · toplam {1}", active, total) : Loc.F("{0} indirme", total);
     }
 
     private void StartFromBox()
@@ -62,7 +63,7 @@ public sealed partial class DownloadsWindow : Window
         var url = UrlBox.Text.Trim();
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
-            UrlBox.Header = "Geçerli bir http/https bağlantısı gir";
+            UrlBox.Header = Loc.T("Geçerli bir http/https bağlantısı gir");
             return;
         }
         UrlBox.Header = null;

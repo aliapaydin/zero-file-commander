@@ -207,7 +207,7 @@ public static class ArchiveService
         Directory.CreateDirectory(folder);
         using var zip = OpenRead(item.ArchivePath!);
         var entry = zip.Entries.FirstOrDefault(e => string.Equals(e.FullName.Replace('\\', '/'), item.EntryName, StringComparison.OrdinalIgnoreCase))
-            ?? throw new FileNotFoundException("Arşivde bulunamadı", item.EntryName);
+            ?? throw new FileNotFoundException(Loc.T("Arşivde bulunamadı"), item.EntryName);
         var path = Path.Combine(folder, item.Name);
         entry.ExtractToFile(path, overwrite: true);
         return path;

@@ -60,7 +60,7 @@ public sealed class SavedConnection
         ConnectionKind.Sftp => "SFTP",
         ConnectionKind.Ftps => "FTPS",
         ConnectionKind.Ftp => "FTP",
-        _ => "Ağ paylaşımı",
+        _ => Loc.T("Ağ paylaşımı"),
     };
 
     [JsonIgnore]
@@ -237,7 +237,7 @@ public static class ConnectionStore
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
-            CrashLog.Write("Bağlantılar okunamadı", ex);
+            CrashLog.Write(Loc.T("Bağlantılar okunamadı"), ex);
         }
         return new();
     }
@@ -252,7 +252,7 @@ public static class ConnectionStore
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            CrashLog.Write("Bağlantılar kaydedilemedi", ex);
+            CrashLog.Write(Loc.T("Bağlantılar kaydedilemedi"), ex);
         }
         Changed?.Invoke(null, EventArgs.Empty);
     }

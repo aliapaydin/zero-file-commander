@@ -33,7 +33,7 @@ public static class CrashLog
             Directory.CreateDirectory(FolderPath);
             var text = new StringBuilder()
                 .AppendLine($"=== {DateTime.Now:yyyy-MM-dd HH:mm:ss} · {source} ===")
-                .AppendLine(exception?.ToString() ?? "(ayrıntı yok)")
+                .AppendLine(exception?.ToString() ?? Loc.T("(ayrıntı yok)"))
                 .AppendLine();
             File.AppendAllText(FilePath, text.ToString(), Encoding.UTF8);
         }

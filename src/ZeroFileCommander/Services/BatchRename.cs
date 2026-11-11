@@ -36,7 +36,7 @@ public sealed class RenameRow
     public bool IsChanged => !HasProblem && !string.Equals(OldName, NewName, StringComparison.Ordinal);
 
     /// <summary>Listede gösterilen durum metni.</summary>
-    public string StatusText => HasProblem ? Problem : IsChanged ? "→" : "değişmez";
+    public string StatusText => HasProblem ? Problem : IsChanged ? "→" : Loc.T("değişmez");
 }
 
 /// <summary>
@@ -57,7 +57,7 @@ public static class BatchRename
         if (options.UseRegex && options.Find.Length > 0)
         {
             try { find = new Regex(options.Find, RegexOptions.IgnoreCase); }
-            catch (ArgumentException ex) { findError = "Geçersiz regex: " + ex.Message; }
+            catch (ArgumentException ex) { findError = Loc.T("Geçersiz regex: ") + ex.Message; }
         }
 
         foreach (var item in items)
@@ -131,23 +131,23 @@ public static class BatchRename
         foreach (var row in rows)
         {
             if (row.HasProblem) continue;
-            if (row.NewName.Length == 0) { row.Problem = "Boş ad"; continue; }
-            if (row.NewName.IndexOfAny(invalid) >= 0) { row.Problem = "Geçersiz karakter"; continue; }
-            if (row.NewName.EndsWith('.')) { row.Problem = "Nokta ile bitemez"; continue; }
+            if (row.NewName.Length == 0) { row.Problem = Loc.T("Boş ad"); continue; }
+            if (row.NewName.IndexOfAny(invalid) >= 0) { row.Problem = Loc.T("Geçersiz karakter"); continue; }
+            if (row.NewName.EndsWith('.')) { row.Problem = Loc.T("Nokta ile bitemez"); continue; }
 
             var folder = Path.GetDirectoryName(row.FullPath.TrimEnd('\\'))!;
             var target = Path.Combine(folder, row.NewName);
             if (seen.TryGetValue(target, out var other))
             {
-                row.Problem = "Aynı ad iki kez";
-                other.Problem = "Aynı ad iki kez";
+                row.Problem = Loc.T("Aynı ad iki kez");
+                other.Problem = Loc.T("Aynı ad iki kez");
                 continue;
             }
             seen[target] = row;
 
             bool exists = File.Exists(target) || Directory.Exists(target);
             bool self = string.Equals(target, row.FullPath, StringComparison.OrdinalIgnoreCase);
-            if (exists && !self && !batchSources.Contains(target)) row.Problem = "Bu adda dosya var";
+            if (exists && !self && !batchSources.Contains(target)) row.Problem = Loc.T("Bu adda dosya var");
         }
     }
 
@@ -217,8 +217,8 @@ public static class BatchRename
     {
         int changed = rows.Count(r => r.IsChanged);
         int problems = rows.Count(r => r.HasProblem);
-        var text = new StringBuilder($"{rows.Count} öğe · {changed} değişecek");
-        if (problems > 0) text.Append($" · {problems} sorun");
+        var text = new StringBuilder(Loc.F("{0} öğe · {1} değişecek", rows.Count, changed));
+        if (problems > 0) text.Append(Loc.F(" · {0} sorun", problems));
         return text.ToString();
     }
 }

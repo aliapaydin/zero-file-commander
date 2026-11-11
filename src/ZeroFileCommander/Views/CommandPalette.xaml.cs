@@ -38,6 +38,7 @@ public sealed partial class CommandPalette : UserControl
     public CommandPalette()
     {
         InitializeComponent();
+        Loc.Apply(this); // XAML metinleri seçili dile
         Visibility = Visibility.Collapsed;
     }
 

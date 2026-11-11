@@ -1,3 +1,4 @@
+using ZeroFileCommander.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -18,18 +19,18 @@ public static class ConnectionDialogs
         var connection = existing?.Clone() ?? new SavedConnection();
         bool isNew = existing is null;
 
-        var name = new TextBox { Header = "Ad", PlaceholderText = "ör. NAS, Web sunucusu", Text = connection.Name };
+        var name = new TextBox { Header = Loc.T("Ad"), PlaceholderText = Loc.T("ör. NAS, Web sunucusu"), Text = connection.Name };
         var kind = new ComboBox
         {
-            Header = "Tür",
+            Header = Loc.T("Tür"),
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            ItemsSource = new[] { "SFTP (SSH)", "FTPS (TLS ile FTP)", "FTP (şifrelenmemiş)", "Ağ paylaşımı / NAS (SMB)" },
+            ItemsSource = new[] { "SFTP (SSH)", Loc.T("FTPS (TLS ile FTP)"), Loc.T("FTP (şifrelenmemiş)"), Loc.T("Ağ paylaşımı / NAS (SMB)") },
             SelectedIndex = Array.IndexOf(Kinds, connection.Kind),
         };
-        var host = new TextBox { Header = "Sunucu", PlaceholderText = "sunucu.ornek.com ya da 192.168.1.10", Text = connection.Host };
+        var host = new TextBox { Header = Loc.T("Sunucu"), PlaceholderText = Loc.T("sunucu.ornek.com ya da 192.168.1.10"), Text = connection.Host };
         var port = new NumberBox
         {
-            Header = "Bağlantı noktası",
+            Header = Loc.T("Bağlantı noktası"),
             Minimum = 0,
             Maximum = 65535,
             Value = connection.Port > 0 ? connection.Port : double.NaN, // boş = varsayılan (SFTP 22, FTP 21)
@@ -37,21 +38,21 @@ public static class ConnectionDialogs
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Hidden,
             Width = 130,
         };
-        var user = new TextBox { Header = "Kullanıcı adı", Text = connection.User };
+        var user = new TextBox { Header = Loc.T("Kullanıcı adı"), Text = connection.User };
         bool hasStored = !isNew && ConnectionStore.GetPassword(connection) is not null;
         var password = new PasswordBox
         {
-            Header = "Parola",
-            PlaceholderText = hasStored ? "Kayıtlı · değiştirmek için yazın" : string.Empty,
+            Header = Loc.T("Parola"),
+            PlaceholderText = hasStored ? Loc.T("Kayıtlı · değiştirmek için yazın") : string.Empty,
         };
         var savePassword = new CheckBox
         {
-            Content = "Parolayı Windows Kimlik Bilgisi Kasası'nda sakla",
+            Content = Loc.T("Parolayı Windows Kimlik Bilgisi Kasası'nda sakla"),
             IsChecked = isNew || ConnectionStore.IsPasswordPersisted(connection),
         };
-        var path = new TextBox { Header = "Başlangıç klasörü", Text = connection.Path };
-        var keyFile = new TextBox { Header = "Özel anahtar dosyası (isteğe bağlı)", Text = connection.KeyFile ?? string.Empty, PlaceholderText = "id_ed25519" };
-        var browse = new Button { Content = "Gözat…", VerticalAlignment = VerticalAlignment.Bottom };
+        var path = new TextBox { Header = Loc.T("Başlangıç klasörü"), Text = connection.Path };
+        var keyFile = new TextBox { Header = Loc.T("Özel anahtar dosyası (isteğe bağlı)"), Text = connection.KeyFile ?? string.Empty, PlaceholderText = "id_ed25519" };
+        var browse = new Button { Content = Loc.T("Gözat…"), VerticalAlignment = VerticalAlignment.Bottom };
         browse.Click += async (_, _) =>
         {
             var picker = new Windows.Storage.Pickers.FileOpenPicker();
@@ -83,15 +84,15 @@ public static class ConnectionDialogs
             bool smb = selected == ConnectionKind.Smb;
             port.Visibility = smb ? Visibility.Collapsed : Visibility.Visible;
             keyRow.Visibility = selected == ConnectionKind.Sftp ? Visibility.Visible : Visibility.Collapsed;
-            path.Header = smb ? "Paylaşım ve klasör" : "Başlangıç klasörü";
-            path.PlaceholderText = smb ? @"Paylasim\Klasor" : "boş bırakılırsa ev klasörü";
-            host.PlaceholderText = smb ? "NAS-ADI ya da 192.168.1.20" : "sunucu.ornek.com ya da 192.168.1.10";
-            user.PlaceholderText = smb ? @"boşsa Windows hesabınız · ALAN\kullanici" : selected == ConnectionKind.Ftp ? "boşsa anonymous" : string.Empty;
-            password.Header = selected == ConnectionKind.Sftp ? "Parola (ya da anahtar parolası)" : "Parola";
+            path.Header = smb ? Loc.T("Paylaşım ve klasör") : Loc.T("Başlangıç klasörü");
+            path.PlaceholderText = smb ? @"Paylasim\Klasor" : Loc.T("boş bırakılırsa ev klasörü");
+            host.PlaceholderText = smb ? "NAS-ADI ya da 192.168.1.20" : Loc.T("sunucu.ornek.com ya da 192.168.1.10");
+            user.PlaceholderText = smb ? Loc.T(@"boşsa Windows hesabınız · ALAN\kullanici") : selected == ConnectionKind.Ftp ? Loc.T("boşsa anonymous") : string.Empty;
+            password.Header = selected == ConnectionKind.Sftp ? Loc.T("Parola (ya da anahtar parolası)") : Loc.T("Parola");
             (hint.IsOpen, hint.Severity, hint.Message) = selected switch
             {
-                ConnectionKind.Ftp => (true, InfoBarSeverity.Warning, "FTP, parolanızı ve dosyaları şifrelemeden gönderir. Sunucu destekliyorsa FTPS ya da SFTP seçin."),
-                ConnectionKind.Smb => (true, InfoBarSeverity.Informational, "Paylaşım Windows'un kendi ağ bağlantısıyla açılır; bağlandıktan sonra tüm işlemler (önizleme, kuyruk, Git) normal klasördeki gibi çalışır."),
+                ConnectionKind.Ftp => (true, InfoBarSeverity.Warning, Loc.T("FTP, parolanızı ve dosyaları şifrelemeden gönderir. Sunucu destekliyorsa FTPS ya da SFTP seçin.")),
+                ConnectionKind.Smb => (true, InfoBarSeverity.Informational, Loc.T("Paylaşım Windows'un kendi ağ bağlantısıyla açılır; bağlandıktan sonra tüm işlemler (önizleme, kuyruk, Git) normal klasördeki gibi çalışır.")),
                 _ => (false, InfoBarSeverity.Informational, string.Empty),
             };
         }
@@ -111,13 +112,13 @@ public static class ConnectionDialogs
         form.Children.Add(hint);
         var scroller = new ScrollViewer { Content = form, MaxHeight = 560, Padding = new Thickness(0, 0, 12, 0) };
 
-        var dialog = Dialogs.Create(root, theme, isNew ? "Yeni bağlantı" : "Bağlantıyı düzenle", scroller,
-            isNew ? "Kaydet ve bağlan" : "Kaydet", "Vazgeç", ContentDialogButton.Primary);
+        var dialog = Dialogs.Create(root, theme, isNew ? Loc.T("Yeni bağlantı") : Loc.T("Bağlantıyı düzenle"), scroller,
+            isNew ? Loc.T("Kaydet ve bağlan") : Loc.T("Kaydet"), Loc.T("Vazgeç"), ContentDialogButton.Primary);
         dialog.PrimaryButtonClick += (_, args) =>
         {
             if (host.Text.Trim().Length == 0)
             {
-                errorBar.Message = "Sunucu adı gerekli.";
+                errorBar.Message = Loc.T("Sunucu adı gerekli.");
                 errorBar.IsOpen = true;
                 args.Cancel = true;
             }
@@ -159,7 +160,7 @@ public static class ConnectionDialogs
         {
             list.Children.Add(new TextBlock
             {
-                Text = "Henüz kayıtlı bağlantı yok. NAS, SFTP ya da FTP sunucusu ekleyebilirsiniz.",
+                Text = Loc.T("Henüz kayıtlı bağlantı yok. NAS, SFTP ya da FTP sunucusu ekleyebilirsiniz."),
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
             });
@@ -186,16 +187,16 @@ public static class ConnectionDialogs
             row.Children.Add(text);
 
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
-            buttons.Children.Add(IconButton("\uE8A7", "Bağlan", () => Choose(ManageAction.Open, connection)));
-            buttons.Children.Add(IconButton("\uE70F", "Düzenle", () => Choose(ManageAction.Edit, connection)));
-            buttons.Children.Add(IconButton("\uE74D", "Sil", () => Choose(ManageAction.Delete, connection)));
+            buttons.Children.Add(IconButton("\uE8A7", Loc.T("Bağlan"), () => Choose(ManageAction.Open, connection)));
+            buttons.Children.Add(IconButton("\uE70F", Loc.T("Düzenle"), () => Choose(ManageAction.Edit, connection)));
+            buttons.Children.Add(IconButton("\uE74D", Loc.T("Sil"), () => Choose(ManageAction.Delete, connection)));
             Grid.SetColumn(buttons, 2);
             row.Children.Add(buttons);
             list.Children.Add(row);
         }
 
-        dialog = Dialogs.Create(root, theme, "Bağlantılar", new ScrollViewer { Content = list, MaxHeight = 480 }, "Yeni bağlantı…", "Kapat");
-        if (ConnectionStore.All.Any(c => c.IsRemote)) dialog.SecondaryButtonText = "Açık oturumları kapat";
+        dialog = Dialogs.Create(root, theme, Loc.T("Bağlantılar"), new ScrollViewer { Content = list, MaxHeight = 480 }, Loc.T("Yeni bağlantı…"), Loc.T("Kapat"));
+        if (ConnectionStore.All.Any(c => c.IsRemote)) dialog.SecondaryButtonText = Loc.T("Açık oturumları kapat");
         var shown = await dialog.ShowAsync();
         if (shown == ContentDialogResult.Primary) return (ManageAction.New, null);
         if (shown == ContentDialogResult.Secondary) return (ManageAction.Disconnect, null);
@@ -224,13 +225,13 @@ public static class ConnectionDialogs
         panel.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
         var box = new PasswordBox
         {
-            Header = connection.User.Length > 0 ? $"{connection.User} için parola" : "Parola",
+            Header = connection.User.Length > 0 ? Loc.F("{0} için parola", connection.User) : Loc.T("Parola"),
         };
         box.Loaded += (_, _) => box.Focus(FocusState.Programmatic);
-        var save = new CheckBox { Content = "Parolayı sakla", IsChecked = ConnectionStore.IsPasswordPersisted(connection) || ConnectionStore.GetPassword(connection) is null };
+        var save = new CheckBox { Content = Loc.T("Parolayı sakla"), IsChecked = ConnectionStore.IsPasswordPersisted(connection) || ConnectionStore.GetPassword(connection) is null };
         panel.Children.Add(box);
         panel.Children.Add(save);
-        var dialog = Dialogs.Create(root, theme, connection.Name, panel, "Bağlan", "Vazgeç", ContentDialogButton.Primary);
+        var dialog = Dialogs.Create(root, theme, connection.Name, panel, Loc.T("Bağlan"), Loc.T("Vazgeç"), ContentDialogButton.Primary);
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return null;
         return (box.Password, save.IsChecked == true);
     }
@@ -240,19 +241,19 @@ public static class ConnectionDialogs
     {
         if (key.IsMismatch)
         {
-            await Dialogs.ConfirmDangerAsync(root, theme, "Sunucu anahtarı değişmiş",
-                $"{connection.Host} sunucusunun kimlik anahtarı daha önce onayladığınızdan farklı.\n\n" +
-                $"Yeni parmak izi: {key.Fingerprint}\nKayıtlı: {connection.HostKey}\n\n" +
-                "Sunucu yeniden kurulduysa bu normaldir; değilse biri araya giriyor olabilir. Güvenlik için bağlanılmadı. " +
-                "Değişikliği sunucu yöneticisiyle doğruladıysanız bağlantıyı düzenleyip sunucu adını yeniden kaydedin.",
-                "Anladım");
+            await Dialogs.ConfirmDangerAsync(root, theme, Loc.T("Sunucu anahtarı değişmiş"),
+                Loc.F("{0} sunucusunun kimlik anahtarı daha önce onayladığınızdan farklı.\n\n", connection.Host) +
+                Loc.F("Yeni parmak izi: {0}\nKayıtlı: {1}\n\n", key.Fingerprint, connection.HostKey) +
+                Loc.T("Sunucu yeniden kurulduysa bu normaldir; değilse biri araya giriyor olabilir. Güvenlik için bağlanılmadı. ") +
+                Loc.T("Değişikliği sunucu yöneticisiyle doğruladıysanız bağlantıyı düzenleyip sunucu adını yeniden kaydedin."),
+                Loc.T("Anladım"));
             return false;
         }
 
         var panel = new StackPanel { Spacing = 10, Width = 440 };
         panel.Children.Add(new TextBlock
         {
-            Text = $"{connection.Host} sunucusuna ilk kez bağlanıyorsunuz. Parmak izinin sunucunuzunkiyle aynı olduğunu doğrulayın:",
+            Text = Loc.F("{0} sunucusuna ilk kez bağlanıyorsunuz. Parmak izinin sunucunuzunkiyle aynı olduğunu doğrulayın:", connection.Host),
             TextWrapping = TextWrapping.Wrap,
         });
         panel.Children.Add(new TextBlock
@@ -264,12 +265,12 @@ public static class ConnectionDialogs
         });
         panel.Children.Add(new TextBlock
         {
-            Text = "Onaylarsanız anahtar kaydedilir; ileride değişirse uyarılırsınız.",
+            Text = Loc.T("Onaylarsanız anahtar kaydedilir; ileride değişirse uyarılırsınız."),
             TextWrapping = TextWrapping.Wrap,
             FontSize = 12,
             Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
         });
-        var dialog = Dialogs.Create(root, theme, "Sunucu kimliğini doğrulayın", panel, "Güven ve bağlan", "Vazgeç", ContentDialogButton.Close);
+        var dialog = Dialogs.Create(root, theme, Loc.T("Sunucu kimliğini doğrulayın"), panel, Loc.T("Güven ve bağlan"), Loc.T("Vazgeç"), ContentDialogButton.Close);
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 }

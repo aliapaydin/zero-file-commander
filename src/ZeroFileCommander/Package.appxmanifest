@@ -11,7 +11,7 @@
   <Identity
     Name="AliApaydin.ZeroFileCommander"
     Publisher="CN=BA57EB18-640B-433D-88C6-EB1D10E9A905"
-    Version="0.8.2.0" />
+    Version="0.9.0.0" />
 
   <Properties>
     <DisplayName>Zero File Commander</DisplayName>

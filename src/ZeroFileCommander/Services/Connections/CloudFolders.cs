@@ -77,7 +77,7 @@ public static class CloudFolders
         }
 
         TryAdd("OneDrive", Environment.GetEnvironmentVariable("OneDriveConsumer"));
-        TryAdd("OneDrive (iş)", Environment.GetEnvironmentVariable("OneDriveCommercial"));
+        TryAdd(Loc.T("OneDrive (iş)"), Environment.GetEnvironmentVariable("OneDriveCommercial"));
         if (found.Count == 0) TryAdd("OneDrive", Environment.GetEnvironmentVariable("OneDrive"));
 
         string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -94,7 +94,7 @@ public static class CloudFolders
                 using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(info));
                 foreach (var account in doc.RootElement.EnumerateObject())
                     if (account.Value.TryGetProperty("path", out var p) && p.GetString() is { } dropboxPath)
-                        TryAdd(account.Name == "business" ? "Dropbox (iş)" : "Dropbox", dropboxPath);
+                        TryAdd(account.Name == "business" ? Loc.T("Dropbox (iş)") : "Dropbox", dropboxPath);
             }
             catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or UnauthorizedAccessException)
             {
@@ -145,11 +145,11 @@ public static class NetworkShares
 
     public static string Describe(int error) => error switch
     {
-        5 => "Erişim reddedildi.",
-        53 or 67 => "Paylaşım bulunamadı. Sunucu adını ve paylaşım adını kontrol edin.",
-        86 or 1326 => "Kullanıcı adı ya da parola yanlış.",
-        1219 => "Bu sunucuya başka bir kullanıcıyla zaten bağlısınız. Windows aynı sunucuya iki farklı kullanıcıyla bağlanmaya izin vermez.",
-        1203 or 1222 => "Ağa ulaşılamıyor.",
+        5 => Loc.T("Erişim reddedildi."),
+        53 or 67 => Loc.T("Paylaşım bulunamadı. Sunucu adını ve paylaşım adını kontrol edin."),
+        86 or 1326 => Loc.T("Kullanıcı adı ya da parola yanlış."),
+        1219 => Loc.T("Bu sunucuya başka bir kullanıcıyla zaten bağlısınız. Windows aynı sunucuya iki farklı kullanıcıyla bağlanmaya izin vermez."),
+        1203 or 1222 => Loc.T("Ağa ulaşılamıyor."),
         _ => new System.ComponentModel.Win32Exception(error).Message,
     };
 

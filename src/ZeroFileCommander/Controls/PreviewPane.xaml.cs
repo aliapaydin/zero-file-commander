@@ -32,6 +32,7 @@ public sealed partial class PreviewPane : UserControl
     public PreviewPane()
     {
         InitializeComponent();
+        Loc.Apply(this); // XAML metinleri seçili dile
         HandlerSurface.LayoutUpdated += (_, _) => PositionHandler();
         Overlay.Changed += (_, _) => UpdateHandlerVisibility();
         Unloaded += (_, _) => _handlerHost?.Dispose();
@@ -58,13 +59,13 @@ public sealed partial class PreviewPane : UserControl
 
         if (item is null || !item.IsEntry)
         {
-            ShowPlaceholder("", "Bir dosya seç");
+            ShowPlaceholder("", Loc.T("Bir dosya seç"));
             NameText.Text = KindText.Text = SizeText.Text = DateText.Text = ExtraText.Text = string.Empty;
             return;
         }
 
         NameText.Text = item.Name;
-        KindText.Text = item.IsDirectory ? "Klasör" : $"{FileKinds.Label(item.Kind)} · {item.Extension}";
+        KindText.Text = item.IsDirectory ? Loc.T("Klasör") : $"{FileKinds.Label(item.Kind)} · {item.Extension}";
         SizeText.Text = item.IsDirectory ? "—" : item.SizeText;
         DateText.Text = item.ModifiedText;
         ExtraText.Text = string.Empty;
@@ -73,8 +74,8 @@ public sealed partial class PreviewPane : UserControl
         // Yalnızca çevrimiçi bulut dosyası: seçmek dosyayı indirmesin, kullanıcı istesin.
         if (item.IsOnlineOnly && !string.Equals(_hydrateAllowed, item.FullPath, StringComparison.OrdinalIgnoreCase))
         {
-            ShowPlaceholder("\uE753", "Bu dosya yalnızca bulutta. Önizlemek onu bu bilgisayara indirir.");
-            PlaceholderAction.Content = "İndir ve önizle";
+            ShowPlaceholder("\uE753", Loc.T("Bu dosya yalnızca bulutta. Önizlemek onu bu bilgisayara indirir."));
+            PlaceholderAction.Content = Loc.T("İndir ve önizle");
             PlaceholderAction.Visibility = Visibility.Visible;
             return;
         }
@@ -93,7 +94,7 @@ public sealed partial class PreviewPane : UserControl
             {
                 var code = await FilePreview.ReadTextHeadAsync(item.FullPath);
                 if (version != _version) return;
-                if (code is null) ShowPlaceholder(item.Glyph, "Metin okunamadı");
+                if (code is null) ShowPlaceholder(item.Glyph, Loc.T("Metin okunamadı"));
                 else ShowCode(code, SyntaxHighlighter.LanguageFor(item.Name));
             }
             else switch (item.Kind)
@@ -105,7 +106,7 @@ public sealed partial class PreviewPane : UserControl
                 case FileKind.Image:
                     var image = await FilePreview.GetFullImageAsync(item.FullPath, 1200);
                     if (version != _version) return;
-                    if (image is null) { ShowPlaceholder(item.Glyph, "Önizleme yok"); break; }
+                    if (image is null) { ShowPlaceholder(item.Glyph, Loc.T("Önizleme yok")); break; }
                     ShowImage(image);
                     if (image.PixelWidth > 0) ExtraText.Text = $"{image.PixelWidth} × {image.PixelHeight}";
                     break;
@@ -115,7 +116,7 @@ public sealed partial class PreviewPane : UserControl
                     if (version != _version) return;
                     if (doc is null || doc.PageCount == 0)
                     {
-                        if (!TryOpenHandler(item)) ShowPlaceholder(item.Glyph, "PDF açılamadı");
+                        if (!TryOpenHandler(item)) ShowPlaceholder(item.Glyph, Loc.T("PDF açılamadı"));
                         break;
                     }
                     _pdf = doc;
@@ -133,14 +134,14 @@ public sealed partial class PreviewPane : UserControl
                     }
                     Player.Source = MediaSource.CreateFromStorageFile(file);
                     Player.Visibility = Visibility.Visible;
-                    ExtraText.Text = autoPlay ? "Çalıyor" : "Space ile çal";
+                    ExtraText.Text = autoPlay ? Loc.T("Çalıyor") : Loc.T("Space ile çal");
                     if (autoPlay) Player.MediaPlayer?.Play();
                     break;
 
                 case FileKind.Text:
                     var text = await FilePreview.ReadTextHeadAsync(item.FullPath);
                     if (version != _version) return;
-                    if (text is null) { ShowPlaceholder(item.Glyph, "Metin okunamadı"); break; }
+                    if (text is null) { ShowPlaceholder(item.Glyph, Loc.T("Metin okunamadı")); break; }
                     ShowCode(text, SyntaxHighlighter.LanguageFor(item.Name));
                     break;
 
@@ -154,15 +155,15 @@ public sealed partial class PreviewPane : UserControl
                         ShowImage(visual);
                     else
                         ShowPlaceholder(item.Glyph, item.Kind == FileKind.Office
-                            ? "Bu belge için Windows önizleyicisi bulunamadı (Office kurulu mu?)"
-                            : "Bu tür için önizleme yok");
+                            ? Loc.T("Bu belge için Windows önizleyicisi bulunamadı (Office kurulu mu?)")
+                            : Loc.T("Bu tür için önizleme yok"));
                     break;
             }
         }
         catch (Exception ex)
         {
             CrashLog.Write("PreviewPane " + item.Extension, ex);
-            if (version == _version) ShowPlaceholder(item.Glyph, "Önizleme yüklenemedi");
+            if (version == _version) ShowPlaceholder(item.Glyph, Loc.T("Önizleme yüklenemedi"));
         }
         finally
         {
@@ -202,17 +203,17 @@ public sealed partial class PreviewPane : UserControl
 
         if (entries.Count == 0)
         {
-            ShowPlaceholder("\uE8B7", "Klasör boş");
+            ShowPlaceholder("\uE8B7", Loc.T("Klasör boş"));
             return;
         }
 
         int total = folders + files;
         FolderSummary.Text = capped
-            ? "10.000+ öğe"
+            ? Loc.T("10.000+ öğe")
             : total > entries.Count
-                ? $"{folders} klasör, {files} dosya · ilk {entries.Count} gösteriliyor"
-                : $"{folders} klasör, {files} dosya";
-        ExtraText.Text = $"{folders} klasör, {files} dosya";
+                ? Loc.F("{0} klasör, {1} dosya · ilk {2} gösteriliyor", folders, files, entries.Count)
+                : Loc.F("{0} klasör, {1} dosya", folders, files);
+        ExtraText.Text = Loc.F("{0} klasör, {1} dosya", folders, files);
 
         FolderGrid.Children.Clear();
         var thumbnails = new List<(FileItem Entry, Image Target)>();
@@ -293,7 +294,7 @@ public sealed partial class PreviewPane : UserControl
 
         ImageScroller.Visibility = Visibility.Visible;
         PageBar.Visibility = _pdf.PageCount > 1 ? Visibility.Visible : Visibility.Collapsed;
-        ExtraText.Text = _pdf.PageCount > count ? $"{_pdf.PageCount} sayfa (ilk {count} gösteriliyor)" : $"{_pdf.PageCount} sayfa";
+        ExtraText.Text = _pdf.PageCount > count ? Loc.F("{0} sayfa (ilk {1} gösteriliyor)", _pdf.PageCount, count) : Loc.F("{0} sayfa", _pdf.PageCount);
         ImageScroller.UpdateLayout();
         UpdatePageHeights();
         await UpdateVisiblePagesAsync(version);
@@ -337,7 +338,7 @@ public sealed partial class PreviewPane : UserControl
             if (y < top + viewport / 3) current = i;
             y += height;
         }
-        PageText.Text = $"Sayfa {current + 1} / {_pdf.PageCount}";
+        PageText.Text = Loc.F("Sayfa {0} / {1}", current + 1, _pdf.PageCount);
 
         foreach (int i in toRender)
         {
@@ -409,7 +410,7 @@ public sealed partial class PreviewPane : UserControl
             HandlerSurface.Visibility = Visibility.Collapsed;
             return false;
         }
-        ExtraText.Text = "Windows önizleyicisi · kaydırarak sayfalar arasında gez";
+        ExtraText.Text = Loc.T("Windows önizleyicisi · kaydırarak sayfalar arasında gez");
         UpdateHandlerVisibility();
         return true;
     }
@@ -511,7 +512,7 @@ public sealed partial class PreviewPane : UserControl
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             if (version != _version) return;
-            CrashLog.Write("Tablo önizleme", ex);
+            CrashLog.Write(Loc.T("Tablo önizleme"), ex);
             // CSV ise düz metne dön; Parquet bozuksa bilgi ver.
             var text = item.Kind == FileKind.Text ? await FilePreview.ReadTextHeadAsync(item.FullPath) : null;
             if (version != _version) return;
@@ -520,13 +521,13 @@ public sealed partial class PreviewPane : UserControl
                 ShowCode(text, null);
                 TextScroller.Visibility = Visibility.Visible;
             }
-            else ShowPlaceholder("\uE80A", "Tablo okunamadı: " + ex.Message);
+            else ShowPlaceholder("\uE80A", Loc.T("Tablo okunamadı: ") + ex.Message);
             return;
         }
         if (version != _version) return;
         if (data.Columns.Count == 0)
         {
-            ShowPlaceholder("\uE80A", data.Details.Length > 0 ? data.Details : "Boş tablo");
+            ShowPlaceholder("\uE80A", data.Details.Length > 0 ? data.Details : Loc.T("Boş tablo"));
             return;
         }
 
@@ -535,10 +536,10 @@ public sealed partial class PreviewPane : UserControl
         TableScroller.ChangeView(0, 0, null, disableAnimation: true);
 
         string rows = data.TotalRows is { } total
-            ? total > data.Rows.Count ? $"{total:N0} satırın ilk {data.Rows.Count:N0}'ü" : $"{total:N0} satır"
-            : $"ilk {data.Rows.Count:N0} satır";
-        KindText.Text = Path.GetExtension(item.FullPath).Equals(".parquet", StringComparison.OrdinalIgnoreCase) ? "Parquet tablosu" : "Ayrılmış metin tablosu";
-        ExtraText.Text = $"{data.Columns.Count} sütun · {rows}\n{data.Details}";
+            ? total > data.Rows.Count ? Loc.F("{0:N0} satırın ilk {1:N0}'ü", total, data.Rows.Count) : Loc.F("{0:N0} satır", total)
+            : Loc.F("ilk {0:N0} satır", data.Rows.Count);
+        KindText.Text = Path.GetExtension(item.FullPath).Equals(".parquet", StringComparison.OrdinalIgnoreCase) ? Loc.T("Parquet tablosu") : Loc.T("Ayrılmış metin tablosu");
+        ExtraText.Text = Loc.F("{0} sütun · {1}\n{2}", data.Columns.Count, rows, data.Details);
     }
 
     /// <summary>
@@ -592,7 +593,7 @@ public sealed partial class PreviewPane : UserControl
             Grid.SetColumn(title, c + 1);
             TableGrid.Children.Add(title);
 
-            bool numeric = data.ColumnTypes.Count > c && data.ColumnTypes[c] is "sayı" or "ondalık" or "tam sayı";
+            bool numeric = data.ColumnTypes.Count > c && (data.ColumnTypes[c] == Loc.T("sayı") || data.ColumnTypes[c] == Loc.T("ondalık") || data.ColumnTypes[c] == Loc.T("tam sayı"));
             int column = c;
             TableGrid.Children.Add(MakeColumn(string.Join("\n", data.Rows.Select(r => r[column])), c + 1, numeric, mono, secondary: false));
         }
@@ -637,21 +638,21 @@ public sealed partial class PreviewPane : UserControl
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             if (version != _version) return;
-            CrashLog.Write("Power BI önizleme", ex);
+            CrashLog.Write(Loc.T("Power BI önizleme"), ex);
             if (item.IsDirectory) await ShowFolderAsync(item, version);
-            else ShowPlaceholder("\uE9D9", "Power BI dosyası okunamadı: " + ex.Message);
+            else ShowPlaceholder("\uE9D9", Loc.T("Power BI dosyası okunamadı: ") + ex.Message);
             return;
         }
         if (version != _version) return;
 
         KindText.Text = item.IsDirectory
-            ? item.Name.EndsWith(".Report", StringComparison.OrdinalIgnoreCase) ? "Power BI raporu (PBIP klasörü)" : "Power BI anlam modeli (PBIP klasörü)"
+            ? item.Name.EndsWith(".Report", StringComparison.OrdinalIgnoreCase) ? Loc.T("Power BI raporu (PBIP klasörü)") : Loc.T("Power BI anlam modeli (PBIP klasörü)")
             : Path.GetExtension(item.FullPath).ToLowerInvariant() switch
             {
-                ".pbix" => "Power BI raporu",
-                ".pbit" => "Power BI şablonu",
-                ".pbip" => "Power BI projesi",
-                _ => "Tablosal model (TMSL)",
+                ".pbix" => Loc.T("Power BI raporu"),
+                ".pbit" => Loc.T("Power BI şablonu"),
+                ".pbip" => Loc.T("Power BI projesi"),
+                _ => Loc.T("Tablosal model (TMSL)"),
             };
         ExtraText.Text = string.Join(" · ", report.Badges);
 
@@ -692,13 +693,13 @@ public sealed partial class PreviewPane : UserControl
             foreach (var entry in section.Entries.Take(MetaEntriesShown))
                 panel.Children.Add(MakeMetaEntry(entry, mono));
             if (section.Entries.Count > MetaEntriesShown)
-                panel.Children.Add(new TextBlock { Text = $"… ve {section.Entries.Count - MetaEntriesShown} tane daha", Style = (Style)Resources["MetaDetailStyle"] });
+                panel.Children.Add(new TextBlock { Text = Loc.F("… ve {0} tane daha", section.Entries.Count - MetaEntriesShown), Style = (Style)Resources["MetaDetailStyle"] });
             MetaStack.Children.Add(panel);
         }
 
         if (MetaStack.Children.Count == 0)
         {
-            ShowPlaceholder("\uE9D9", "Okunabilir bir yapı bulunamadı");
+            ShowPlaceholder("\uE9D9", Loc.T("Okunabilir bir yapı bulunamadı"));
             return;
         }
         MetaScroller.Visibility = Visibility.Visible;
@@ -749,7 +750,7 @@ public sealed partial class PreviewPane : UserControl
         PreviewText.Blocks.Add(BuildCodeParagraph(text, language));
         TextScroller.Visibility = Visibility.Visible;
         TextScroller.ChangeView(0, 0, null, disableAnimation: true);
-        if (language is not null) KindText.Text = $"{language} kodu · {_current?.Extension}";
+        if (language is not null) KindText.Text = Loc.F("{0} kodu · {1}", language, _current?.Extension);
     }
 
     private Paragraph BuildCodeParagraph(string text, string? language)
@@ -816,10 +817,10 @@ public sealed partial class PreviewPane : UserControl
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             if (version != _version) return;
-            CrashLog.Write("Not defteri önizleme", ex);
+            CrashLog.Write(Loc.T("Not defteri önizleme"), ex);
             var raw = await FilePreview.ReadTextHeadAsync(item.FullPath);
             if (version != _version) return;
-            if (raw is null) ShowPlaceholder(item.Glyph, "Not defteri okunamadı");
+            if (raw is null) ShowPlaceholder(item.Glyph, Loc.T("Not defteri okunamadı"));
             else ShowCode(raw, "JSON");
             return;
         }
@@ -837,8 +838,8 @@ public sealed partial class PreviewPane : UserControl
             _ => "py",
         });
         int codeCells = notebook.Cells.Count(c => c.IsCode);
-        KindText.Text = $"Jupyter not defteri · {notebook.KernelName ?? notebook.Language}";
-        ExtraText.Text = $"{notebook.TotalCells} hücre · {codeCells} kod" + (notebook.TotalCells > notebook.Cells.Count ? $" · ilk {notebook.Cells.Count} gösteriliyor" : string.Empty);
+        KindText.Text = Loc.F("Jupyter not defteri · {0}", notebook.KernelName ?? notebook.Language);
+        ExtraText.Text = Loc.F("{0} hücre · {1} kod", notebook.TotalCells, codeCells) + (notebook.TotalCells > notebook.Cells.Count ? Loc.F(" · ilk {0} gösteriliyor", notebook.Cells.Count) : string.Empty);
 
         var mono = new FontFamily("Cascadia Mono, Consolas");
         var codeBackground = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"];
@@ -920,7 +921,7 @@ public sealed partial class PreviewPane : UserControl
 
         if (MetaStack.Children.Count == 0)
         {
-            ShowPlaceholder(item.Glyph, "Not defteri boş");
+            ShowPlaceholder(item.Glyph, Loc.T("Not defteri boş"));
             return;
         }
         MetaScroller.Visibility = Visibility.Visible;
@@ -940,8 +941,8 @@ public sealed partial class PreviewPane : UserControl
         VsCodeButton.Visibility = Visibility.Visible;
         VsCodeButton.IsEnabled = installed;
         ToolTipService.SetToolTip(VsCodeButton, installed
-            ? (item.IsDirectory ? "Klasörü VS Code'da aç" : "Dosyayı VS Code'da aç")
-            : "Visual Studio Code bu bilgisayarda bulunamadı");
+            ? (item.IsDirectory ? Loc.T("Klasörü VS Code'da aç") : Loc.T("Dosyayı VS Code'da aç"))
+            : Loc.T("Visual Studio Code bu bilgisayarda bulunamadı"));
     }
 
     private void VsCodeButton_Click(object sender, RoutedEventArgs e)

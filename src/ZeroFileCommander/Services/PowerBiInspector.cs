@@ -96,23 +96,23 @@ public static class PowerBiInspector
             .GroupBy(e => e.FullName, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-        var file = report.Section("Dosya", "");
+        var file = report.Section(Loc.T("Dosya"), "");
         if (entries.TryGetValue("Version", out var version))
-            file.Entries.Add(new MetaEntry("Biçim sürümü", ReadUtf16(version).Trim()));
+            file.Entries.Add(new MetaEntry(Loc.T("Biçim sürümü"), ReadUtf16(version).Trim()));
         if (entries.TryGetValue("Metadata", out var metadata))
         {
             try
             {
                 using var doc = JsonDocument.Parse(ReadUtf16(metadata));
                 if (Str(doc.RootElement, "CreatedFrom") is { } from)
-                    file.Entries.Add(new MetaEntry("Oluşturulduğu yer", from + (Str(doc.RootElement, "CreatedFromRelease") is { } rel ? $" ({rel})" : "")));
+                    file.Entries.Add(new MetaEntry(Loc.T("Oluşturulduğu yer"), from + (Str(doc.RootElement, "CreatedFromRelease") is { } rel ? $" ({rel})" : "")));
             }
             catch (JsonException) { }
         }
         if (entries.TryGetValue("DataModel", out var dataModel))
         {
-            file.Entries.Add(new MetaEntry("Veri modeli", $"{Models.FileItem.FormatSize(dataModel.Length)} (sıkıştırılmış)"));
-            report.Notes.Add("PBIX içindeki veri modeli ikili ve sıkıştırılmış olduğundan tablo/ölçü listesi okunamıyor. Ayrıntı için dosyayı PBIT şablonu veya PBIP projesi olarak kaydedin.");
+            file.Entries.Add(new MetaEntry(Loc.T("Veri modeli"), Loc.F("{0} (sıkıştırılmış)", Models.FileItem.FormatSize(dataModel.Length))));
+            report.Notes.Add(Loc.T("PBIX içindeki veri modeli ikili ve sıkıştırılmış olduğundan tablo/ölçü listesi okunamıyor. Ayrıntı için dosyayı PBIT şablonu veya PBIP projesi olarak kaydedin."));
         }
 
         if (entries.TryGetValue("Report/Layout", out var layout))
@@ -136,7 +136,7 @@ public static class PowerBiInspector
         {
             using var doc = JsonDocument.Parse(json);
             if (!doc.RootElement.TryGetProperty("sections", out var sections) || sections.ValueKind != JsonValueKind.Array) return;
-            var pages = report.Section("Sayfalar", "");
+            var pages = report.Section(Loc.T("Sayfalar"), "");
             int visualTotal = 0;
             foreach (var section in sections.EnumerateArray().OrderBy(s => Int(s, "ordinal") ?? 0))
             {
@@ -156,10 +156,10 @@ public static class PowerBiInspector
                     }
                 }
                 visualTotal += types.Count;
-                pages.Entries.Add(new MetaEntry(Str(section, "displayName") ?? Str(section, "name") ?? "Sayfa", DescribeVisuals(types)));
+                pages.Entries.Add(new MetaEntry(Str(section, "displayName") ?? Str(section, "name") ?? Loc.T("Sayfa"), DescribeVisuals(types)));
             }
-            report.Badges.Add($"{pages.Entries.Count} sayfa");
-            if (visualTotal > 0) report.Badges.Add($"{visualTotal} görsel");
+            report.Badges.Add(Loc.F("{0} sayfa", pages.Entries.Count));
+            if (visualTotal > 0) report.Badges.Add(Loc.F("{0} görsel", visualTotal));
         }
         catch (JsonException) { }
     }
@@ -169,18 +169,18 @@ public static class PowerBiInspector
         try
         {
             using var doc = JsonDocument.Parse(json);
-            var section = report.Section("Bağlantılar", "");
+            var section = report.Section(Loc.T("Bağlantılar"), "");
             if (doc.RootElement.TryGetProperty("Connections", out var connections) && connections.ValueKind == JsonValueKind.Array)
             {
                 foreach (var connection in connections.EnumerateArray())
                 {
-                    string type = Str(connection, "ConnectionType") ?? "bağlantı";
+                    string type = Str(connection, "ConnectionType") ?? Loc.T("bağlantı");
                     string name = Str(connection, "Name") ?? type;
                     section.Entries.Add(new MetaEntry(name, type switch
                     {
-                        "pbiServiceLive" => "Power BI hizmetindeki anlam modeline canlı bağlantı",
-                        "analysisServicesDatabaseLive" => "Analysis Services'e canlı bağlantı",
-                        "pbiServiceXmlaStyleLive" => "XMLA canlı bağlantı",
+                        "pbiServiceLive" => Loc.T("Power BI hizmetindeki anlam modeline canlı bağlantı"),
+                        "analysisServicesDatabaseLive" => Loc.T("Analysis Services'e canlı bağlantı"),
+                        "pbiServiceXmlaStyleLive" => Loc.T("XMLA canlı bağlantı"),
                         _ => type,
                     }, Str(connection, "ConnectionString")));
                 }
@@ -189,7 +189,7 @@ public static class PowerBiInspector
             {
                 foreach (var artifact in remote.EnumerateArray())
                     if (Str(artifact, "ReportId") is { } reportId)
-                        section.Entries.Add(new MetaEntry("Yayımlanmış rapor", reportId));
+                        section.Entries.Add(new MetaEntry(Loc.T("Yayımlanmış rapor"), reportId));
             }
             if (section.Entries.Count == 0) report.Sections.Remove(section);
         }
@@ -238,7 +238,7 @@ public static class PowerBiInspector
             string name = matches[i].Groups["name"].Value.Replace("\"\"", "\"");
             queries.Entries.Add(new MetaEntry(name, DescribeSource(body), body));
         }
-        report.Badges.Add($"{queries.Entries.Count} sorgu");
+        report.Badges.Add(Loc.F("{0} sorgu", queries.Entries.Count));
     }
 
     private static string? DescribeSource(string m)
@@ -247,11 +247,11 @@ public static class PowerBiInspector
         {
             ("Sql.Database", "SQL Server"), ("Sql.Databases", "SQL Server"), ("Excel.Workbook", "Excel"),
             ("Csv.Document", "CSV"), ("SharePoint.", "SharePoint"), ("Web.Contents", "Web"), ("OData.Feed", "OData"),
-            ("Folder.Files", "Klasör"), ("Oracle.Database", "Oracle"), ("PostgreSQL.Database", "PostgreSQL"),
+            ("Folder.Files", Loc.T("Klasör")), ("Oracle.Database", "Oracle"), ("PostgreSQL.Database", "PostgreSQL"),
             ("MySQL.Database", "MySQL"), ("Snowflake.", "Snowflake"), ("GoogleBigQuery.", "BigQuery"),
             ("Databricks.", "Databricks"), ("AzureStorage.", "Azure Storage"), ("Json.Document", "JSON"),
             ("Parquet.Document", "Parquet"), ("PowerPlatform.Dataflows", "Dataflow"), ("Lakehouse.", "Lakehouse"),
-            ("Table.FromRows", "Girilen veri"),
+            ("Table.FromRows", Loc.T("Girilen veri")),
         };
         var found = sources.Where(s => m.Contains(s.Pattern, StringComparison.Ordinal)).Select(s => s.Label).Distinct().ToList();
         return found.Count > 0 ? string.Join(", ", found) : null;
@@ -265,9 +265,9 @@ public static class PowerBiInspector
         var root = doc.RootElement;
         var model = root.TryGetProperty("model", out var m) ? m : root;
 
-        var tables = report.Section("Tablolar", "");
-        var measures = report.Section("Ölçüler", "");
-        var calculated = report.Section("Hesaplanmış sütunlar", "");
+        var tables = report.Section(Loc.T("Tablolar"), "");
+        var measures = report.Section(Loc.T("Ölçüler"), "");
+        var calculated = report.Section(Loc.T("Hesaplanmış sütunlar"), "");
         int autoDate = 0;
         var queries = new List<(string Name, string Code)>();
 
@@ -313,27 +313,27 @@ public static class PowerBiInspector
                             string? type = Str(source, "type");
                             if (Text(source, "expression") is { } code)
                                 queries.Add((name, code));
-                            if (type == "calculated") mode = "hesaplanmış tablo";
+                            if (type == "calculated") mode = Loc.T("hesaplanmış tablo");
                         }
                     }
                 }
                 bool hidden = table.TryGetProperty("isHidden", out var h) && h.ValueKind == JsonValueKind.True;
                 tables.Entries.Add(new MetaEntry(name, Join(
-                    Plural(columnCount, "sütun"), measureCount > 0 ? Plural(measureCount, "ölçü") : null,
-                    mode is null or "import" ? null : mode, hidden ? "gizli" : null)));
+                    Plural(columnCount, Loc.T("sütun")), measureCount > 0 ? Plural(measureCount, Loc.T("ölçü")) : null,
+                    mode is null or "import" ? null : mode, hidden ? Loc.T("gizli") : null)));
             }
         }
 
         if (model.TryGetProperty("relationships", out var relationships) && relationships.ValueKind == JsonValueKind.Array)
         {
-            var section = report.Section("İlişkiler", "");
+            var section = report.Section(Loc.T("İlişkiler"), "");
             foreach (var relation in relationships.EnumerateArray())
             {
                 bool inactive = relation.TryGetProperty("isActive", out var active) && active.ValueKind == JsonValueKind.False;
                 bool both = Str(relation, "crossFilteringBehavior") == "bothDirections";
                 section.Entries.Add(new MetaEntry(
                     $"{Str(relation, "fromTable")}[{Str(relation, "fromColumn")}] → {Str(relation, "toTable")}[{Str(relation, "toColumn")}]",
-                    Join(both ? "çift yönlü" : null, inactive ? "pasif" : null)));
+                    Join(both ? Loc.T("çift yönlü") : null, inactive ? Loc.T("pasif") : null)));
             }
         }
 
@@ -345,13 +345,13 @@ public static class PowerBiInspector
         }
 
         if (autoDate > 0)
-            report.Notes.Add($"{autoDate} otomatik tarih tablosu gizlendi (Seçenekler → Otomatik tarih/saat).");
+            report.Notes.Add(Loc.F("{0} otomatik tarih tablosu gizlendi (Seçenekler → Otomatik tarih/saat).", autoDate));
         AddModelBadges(report, tables.Entries.Count, measures.Entries.Count,
-            report.Sections.FirstOrDefault(s => s.Title == "İlişkiler")?.Entries.Count ?? 0);
+            report.Sections.FirstOrDefault(s => s.Title == Loc.T("İlişkiler"))?.Entries.Count ?? 0);
         if (Str(model, "culture") is { } culture)
-            report.Section("Dosya", "").Entries.Add(new MetaEntry("Model kültürü", culture));
+            report.Section(Loc.T("Dosya"), "").Entries.Add(new MetaEntry(Loc.T("Model kültürü"), culture));
         if (root.TryGetProperty("compatibilityLevel", out var level) && level.ValueKind == JsonValueKind.Number)
-            report.Section("Dosya", "").Entries.Add(new MetaEntry("Uyumluluk düzeyi", level.GetRawText()));
+            report.Section(Loc.T("Dosya"), "").Entries.Add(new MetaEntry(Loc.T("Uyumluluk düzeyi"), level.GetRawText()));
     }
 
     // ---------------------------------------------------------------- PBIP
@@ -371,9 +371,9 @@ public static class PowerBiInspector
         catch (JsonException) { }
 
         reportPath ??= Path.Combine(folder, Path.GetFileNameWithoutExtension(path) + ".Report");
-        report.Section("Dosya", "").Entries.Add(new MetaEntry("Power BI projesi (PBIP)", Path.GetFileName(reportPath)));
+        report.Section(Loc.T("Dosya"), "").Entries.Add(new MetaEntry(Loc.T("Power BI projesi (PBIP)"), Path.GetFileName(reportPath)));
         if (Directory.Exists(reportPath)) ReadReportFolder(reportPath, report);
-        else report.Notes.Add("Rapor klasörü bulunamadı: " + reportPath);
+        else report.Notes.Add(Loc.T("Rapor klasörü bulunamadı: ") + reportPath);
     }
 
     private static void ReadReportFolder(string reportFolder, MetaReport report)
@@ -397,8 +397,8 @@ public static class PowerBiInspector
                     if (reference.TryGetProperty("byPath", out var byPath) && Str(byPath, "path") is { } relative)
                         modelFolder = Path.GetFullPath(Path.Combine(reportFolder, relative));
                     else if (reference.TryGetProperty("byConnection", out var byConnection))
-                        report.Section("Bağlantılar", "").Entries.Add(new MetaEntry("Uzak anlam modeli",
-                            Str(byConnection, "pbiModelDatabaseName") ?? Str(byConnection, "connectionString") ?? "canlı bağlantı",
+                        report.Section(Loc.T("Bağlantılar"), "").Entries.Add(new MetaEntry(Loc.T("Uzak anlam modeli"),
+                            Str(byConnection, "pbiModelDatabaseName") ?? Str(byConnection, "connectionString") ?? Loc.T("canlı bağlantı"),
                             Str(byConnection, "connectionString")));
                 }
             }
@@ -431,7 +431,7 @@ public static class PowerBiInspector
         var folders = Directory.GetDirectories(pagesFolder)
             .OrderBy(d => { int i = order.IndexOf(Path.GetFileName(d)); return i < 0 ? int.MaxValue : i; })
             .ToList();
-        var pages = report.Section("Sayfalar", "");
+        var pages = report.Section(Loc.T("Sayfalar"), "");
         int visualTotal = 0;
         foreach (var folder in folders)
         {
@@ -464,8 +464,8 @@ public static class PowerBiInspector
             visualTotal += types.Count;
             pages.Entries.Add(new MetaEntry(name, DescribeVisuals(types)));
         }
-        report.Badges.Add($"{pages.Entries.Count} sayfa");
-        if (visualTotal > 0) report.Badges.Add($"{visualTotal} görsel");
+        report.Badges.Add(Loc.F("{0} sayfa", pages.Entries.Count));
+        if (visualTotal > 0) report.Badges.Add(Loc.F("{0} görsel", visualTotal));
     }
 
     private static void ReadSemanticModelFolder(string folder, MetaReport report)
@@ -474,16 +474,16 @@ public static class PowerBiInspector
         var definition = Path.Combine(folder, "definition");
         if (File.Exists(bim)) ReadModelJson(File.ReadAllText(bim), report);
         else if (Directory.Exists(definition)) ReadTmdl(definition, report);
-        else report.Notes.Add("Anlam modeli tanımı bulunamadı (model.bim veya definition/).");
+        else report.Notes.Add(Loc.T("Anlam modeli tanımı bulunamadı (model.bim veya definition/)."));
     }
 
     // ---------------------------------------------------------------- TMDL
 
     private static void ReadTmdl(string definition, MetaReport report)
     {
-        var tables = report.Section("Tablolar", "");
-        var measures = report.Section("Ölçüler", "");
-        var calculated = report.Section("Hesaplanmış sütunlar", "");
+        var tables = report.Section(Loc.T("Tablolar"), "");
+        var measures = report.Section(Loc.T("Ölçüler"), "");
+        var calculated = report.Section(Loc.T("Hesaplanmış sütunlar"), "");
         var queries = new List<(string Name, string Code)>();
         int autoDate = 0;
 
@@ -530,7 +530,7 @@ public static class PowerBiInspector
                         // partition Ad = m / calculated
                         int eq = text.LastIndexOf('=');
                         string kind = eq > 0 ? text[(eq + 1)..].Trim() : string.Empty;
-                        if (kind == "calculated") mode = "hesaplanmış tablo";
+                        if (kind == "calculated") mode = Loc.T("hesaplanmış tablo");
                     }
                     else if (indent == 2 && text.StartsWith("mode:", StringComparison.Ordinal))
                     {
@@ -552,8 +552,8 @@ public static class PowerBiInspector
                     continue;
                 }
                 tables.Entries.Add(new MetaEntry(tableName, Join(
-                    Plural(columns, "sütun"), measureCount > 0 ? Plural(measureCount, "ölçü") : null,
-                    mode is null or "import" ? null : mode, hidden ? "gizli" : null)));
+                    Plural(columns, Loc.T("sütun")), measureCount > 0 ? Plural(measureCount, Loc.T("ölçü")) : null,
+                    mode is null or "import" ? null : mode, hidden ? Loc.T("gizli") : null)));
             }
         }
 
@@ -561,13 +561,13 @@ public static class PowerBiInspector
         int relationCount = 0;
         if (File.Exists(relationshipsFile))
         {
-            var section = report.Section("İlişkiler", "");
+            var section = report.Section(Loc.T("İlişkiler"), "");
             string? from = null, to = null;
             bool inactive = false, both = false, open = false;
             void Flush()
             {
                 if (open && from is not null && to is not null)
-                    section.Entries.Add(new MetaEntry($"{FormatColumnRef(from)} → {FormatColumnRef(to)}", Join(both ? "çift yönlü" : null, inactive ? "pasif" : null)));
+                    section.Entries.Add(new MetaEntry($"{FormatColumnRef(from)} → {FormatColumnRef(to)}", Join(both ? Loc.T("çift yönlü") : null, inactive ? Loc.T("pasif") : null)));
                 from = to = null;
                 inactive = both = false;
             }
@@ -596,7 +596,7 @@ public static class PowerBiInspector
         if (File.Exists(expressions))
         {
             var lines = File.ReadAllLines(expressions);
-            var section = report.Section("Parametreler ve ortak sorgular", "");
+            var section = report.Section(Loc.T("Parametreler ve ortak sorgular"), "");
             for (int i = 0; i < lines.Length; i++)
             {
                 var (indent, text) = Split(lines[i]);
@@ -615,7 +615,7 @@ public static class PowerBiInspector
         }
 
         if (autoDate > 0)
-            report.Notes.Add($"{autoDate} otomatik tarih tablosu gizlendi (Seçenekler → Otomatik tarih/saat).");
+            report.Notes.Add(Loc.F("{0} otomatik tarih tablosu gizlendi (Seçenekler → Otomatik tarih/saat).", autoDate));
         AddModelBadges(report, tables.Entries.Count, measures.Entries.Count, relationCount);
     }
 
@@ -704,16 +704,16 @@ public static class PowerBiInspector
 
     private static void AddModelBadges(MetaReport report, int tables, int measures, int relationships)
     {
-        if (tables > 0) report.Badges.Insert(0, $"{tables} tablo");
-        if (measures > 0) report.Badges.Add($"{measures} ölçü");
-        if (relationships > 0) report.Badges.Add($"{relationships} ilişki");
+        if (tables > 0) report.Badges.Insert(0, Loc.F("{0} tablo", tables));
+        if (measures > 0) report.Badges.Add(Loc.F("{0} ölçü", measures));
+        if (relationships > 0) report.Badges.Add(Loc.F("{0} ilişki", relationships));
     }
 
     private static void Finish(MetaReport report)
     {
         report.Sections.RemoveAll(s => s.Entries.Count == 0);
         // Okuma sırası: dosya bilgisi en sonda.
-        var file = report.Sections.FirstOrDefault(s => s.Title == "Dosya");
+        var file = report.Sections.FirstOrDefault(s => s.Title == Loc.T("Dosya"));
         if (file is not null)
         {
             report.Sections.Remove(file);
@@ -742,14 +742,14 @@ public static class PowerBiInspector
 
     private static string? DescribeVisuals(List<string> types)
     {
-        if (types.Count == 0) return "görsel yok";
+        if (types.Count == 0) return Loc.T("görsel yok");
         var groups = types
-            .GroupBy(t => VisualNames.TryGetValue(t, out var label) ? label : t)
+            .GroupBy(t => VisualNames.TryGetValue(t, out var label) ? Loc.T(label) : t)
             .OrderByDescending(g => g.Count())
             .Select(g => g.Count() > 1 ? $"{g.Count()} {g.Key}" : g.Key)
             .Take(6)
             .ToList();
-        return $"{Plural(types.Count, "görsel")}: {string.Join(", ", groups)}";
+        return $"{Plural(types.Count, Loc.T("görsel"))}: {string.Join(", ", groups)}";
     }
 
     private static string Plural(int count, string noun) => $"{count} {noun}";

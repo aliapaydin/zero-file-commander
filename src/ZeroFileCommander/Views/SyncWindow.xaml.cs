@@ -18,6 +18,7 @@ public sealed partial class SyncWindow : Window
     public SyncWindow(string left, string right)
     {
         InitializeComponent();
+        Loc.Apply(this); // XAML metinleri seçili dile
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarArea);
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
@@ -37,11 +38,11 @@ public sealed partial class SyncWindow : Window
         var right = RightBox.Text.Trim();
         if (!Directory.Exists(left) || !Directory.Exists(right))
         {
-            SummaryText.Text = "İki klasör de var olmalı.";
+            SummaryText.Text = Loc.T("İki klasör de var olmalı.");
             return;
         }
 
-        SetBusy(true, "Karşılaştırılıyor…");
+        SetBusy(true, Loc.T("Karşılaştırılıyor…"));
         _cts = new CancellationTokenSource();
         try
         {
@@ -50,7 +51,7 @@ public sealed partial class SyncWindow : Window
         }
         catch (OperationCanceledException)
         {
-            SummaryText.Text = "Durduruldu.";
+            SummaryText.Text = Loc.T("Durduruldu.");
         }
         catch (Exception ex)
         {
@@ -67,7 +68,7 @@ public sealed partial class SyncWindow : Window
         bool showSame = ShowSameCheck.IsChecked == true;
         var visible = _entries.Where(e => showSame || e.State != SyncState.Same).ToList();
         ResultList.ItemsSource = visible;
-        EmptyText.Text = _entries.Count == 0 ? "Karşılaştır'a bas" : "Fark yok — klasörler eşit";
+        EmptyText.Text = _entries.Count == 0 ? Loc.T("Karşılaştır'a bas") : Loc.T("Fark yok — klasörler eşit");
         EmptyText.Visibility = visible.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         UpdateSummary();
     }
@@ -79,9 +80,9 @@ public sealed partial class SyncWindow : Window
         int toLeft = _entries.Count(e => e.Action == SyncAction.CopyLeft);
         int same = _entries.Count(e => e.State == SyncState.Same);
         int different = _entries.Count(e => e.State == SyncState.Different);
-        SummaryText.Text = $"{_entries.Count} öğe · {same} aynı · {toRight} sağa, {toLeft} sola kopyalanacak"
-            + (different > 0 ? $" · {different} farklı (tarihi aynı, karar senin)" : string.Empty)
-            + " · Hiçbir dosya silinmez.";
+        SummaryText.Text = Loc.F("{0} öğe · {1} aynı · {2} sağa, {3} sola kopyalanacak", _entries.Count, same, toRight, toLeft)
+            + (different > 0 ? Loc.F(" · {0} farklı (tarihi aynı, karar senin)", different) : string.Empty)
+            + Loc.T(" · Hiçbir dosya silinmez.");
         SyncButton.IsEnabled = toRight + toLeft > 0;
     }
 
@@ -103,7 +104,7 @@ public sealed partial class SyncWindow : Window
 
     private async void Sync_Click(object sender, RoutedEventArgs e)
     {
-        SetBusy(true, "Kopyalanıyor…");
+        SetBusy(true, Loc.T("Kopyalanıyor…"));
         _cts = new CancellationTokenSource();
         var progress = new Progress<(int Done, int Total, string Current)>(p =>
         {
@@ -117,12 +118,12 @@ public sealed partial class SyncWindow : Window
             SetBusy(false, null);
             await CompareAsync();
             SummaryText.Text = errors.Count == 0
-                ? $"{done} öğe kopyalandı. " + SummaryText.Text
-                : $"{done} öğe kopyalandı, {errors.Count} hata: {string.Join(" · ", errors.Take(3))}";
+                ? Loc.F("{0} öğe kopyalandı. ", done) + SummaryText.Text
+                : Loc.F("{0} öğe kopyalandı, {1} hata: {2}", done, errors.Count, string.Join(" · ", errors.Take(3)));
         }
         catch (OperationCanceledException)
         {
-            SetBusy(false, "Durduruldu.");
+            SetBusy(false, Loc.T("Durduruldu."));
             Synced?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -135,7 +136,7 @@ public sealed partial class SyncWindow : Window
         SyncButton.IsEnabled = !busy && _entries.Any(x => x.Action != SyncAction.None);
         CancelButton.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         SyncProgress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
-        SyncProgress.IsIndeterminate = busy && message == "Karşılaştırılıyor…";
+        SyncProgress.IsIndeterminate = busy && message == Loc.T("Karşılaştırılıyor…");
         if (message is not null) SummaryText.Text = message;
     }
 }

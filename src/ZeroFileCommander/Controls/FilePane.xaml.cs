@@ -104,6 +104,7 @@ public sealed partial class FilePane : UserControl
     public FilePane()
     {
         InitializeComponent();
+        Loc.Apply(this); // XAML metinleri seçili dile
         _hoverTimer = DispatcherQueue.CreateTimer();
         _hoverTimer.IsRepeating = false;
         _hoverTimer.Tick += HoverTimer_Tick;
@@ -235,13 +236,13 @@ public sealed partial class FilePane : UserControl
         UpdateTabHeader(item);
 
         var menu = new MenuFlyout();
-        var other = new MenuFlyoutItem { Text = "Karşı panelde aç", Icon = new FontIcon { Glyph = "\uE8AB" } };
+        var other = new MenuFlyoutItem { Text = Loc.T("Karşı panelde aç"), Icon = new FontIcon { Glyph = "\uE8AB" } };
         other.Click += (_, _) => Host?.OpenInOtherPane(this, tab.Path);
-        var duplicate = new MenuFlyoutItem { Text = "Sekmeyi çoğalt", Icon = new FontIcon { Glyph = "\uE8C8" } };
+        var duplicate = new MenuFlyoutItem { Text = Loc.T("Sekmeyi çoğalt"), Icon = new FontIcon { Glyph = "\uE8C8" } };
         duplicate.Click += (_, _) => AddTab(tab.Path);
-        var closeOthers = new MenuFlyoutItem { Text = "Diğer sekmeleri kapat" };
+        var closeOthers = new MenuFlyoutItem { Text = Loc.T("Diğer sekmeleri kapat") };
         closeOthers.Click += (_, _) => CloseOtherTabs(item);
-        var close = new MenuFlyoutItem { Text = "Sekmeyi kapat", KeyboardAcceleratorTextOverride = "Ctrl+W" };
+        var close = new MenuFlyoutItem { Text = Loc.T("Sekmeyi kapat"), KeyboardAcceleratorTextOverride = "Ctrl+W" };
         close.Click += (_, _) => CloseTab(item);
         menu.Items.Add(other);
         menu.Items.Add(duplicate);
@@ -256,7 +257,7 @@ public sealed partial class FilePane : UserControl
     {
         if (item.Tag is not PaneTab tab) return;
         string name;
-        if (tab.Path.Length == 0) name = "Bu bilgisayar";
+        if (tab.Path.Length == 0) name = Loc.T("Bu bilgisayar");
         else if (RemotePath.LooksRemote(tab.Path))
         {
             // sftp://kullanici@sunucu/a/b → "b" (kökte sunucu adı)
@@ -270,7 +271,7 @@ public sealed partial class FilePane : UserControl
             if (name.Length == 0) name = tab.Path; // sürücü kökü: "C:\"
         }
         item.Header = name;
-        ToolTipService.SetToolTip(item, tab.Path.Length == 0 ? "Bu bilgisayar" : tab.Path);
+        ToolTipService.SetToolTip(item, tab.Path.Length == 0 ? Loc.T("Bu bilgisayar") : tab.Path);
         if (item.IconSource is FontIconSource icon) icon.Glyph = tab.Path.Length == 0 ? "\uEDA2" : "\uE8B7";
     }
 
@@ -350,7 +351,7 @@ public sealed partial class FilePane : UserControl
             }
             else
             {
-                throw new DirectoryNotFoundException($"Klasör bulunamadı: {path}");
+                throw new DirectoryNotFoundException(Loc.F("Klasör bulunamadı: {0}", path));
             }
         }
         catch (Exception ex)
@@ -423,11 +424,11 @@ public sealed partial class FilePane : UserControl
         int version = ++_remoteVersion;
         if (!RemotePath.TryParse(uri, out var connection, out var path))
         {
-            StatusText.Text = "Bu adres için kayıtlı bağlantı yok: " + uri;
+            StatusText.Text = Loc.T("Bu adres için kayıtlı bağlantı yok: ") + uri;
             return;
         }
         if (Host is null) return;
-        if (!sameFolder) StatusText.Text = $"{connection.Name}: bağlanılıyor…";
+        if (!sameFolder) StatusText.Text = Loc.F("{0}: bağlanılıyor…", connection.Name);
         // Açılışta sekme geri yüklenirken pencere henüz hazır değilse diyaloglar için bekle.
         if (XamlRoot is null)
         {
@@ -447,7 +448,7 @@ public sealed partial class FilePane : UserControl
                 UpdateStatus();
                 return;
             }
-            if (!sameFolder) StatusText.Text = $"{connection.Name}: listeleniyor…";
+            if (!sameFolder) StatusText.Text = Loc.F("{0}: listeleniyor…", connection.Name);
             if (path.Length == 0) path = RemotePath.Normalize(await session.GetHomeAsync(CancellationToken.None));
             var entries = await session.ListAsync(path, CancellationToken.None);
             if (version != _remoteVersion) return;
@@ -480,7 +481,7 @@ public sealed partial class FilePane : UserControl
         catch (Exception ex)
         {
             if (version != _remoteVersion) return;
-            StatusText.Text = ex is DirectoryNotFoundException ? "Uzak klasör bulunamadı: " + path : ex.Message;
+            StatusText.Text = ex is DirectoryNotFoundException ? Loc.T("Uzak klasör bulunamadı: ") + path : ex.Message;
             // Oturum kopmuş olabilir; sonraki denemede yeniden bağlansın.
             if (ex is IOException or Renci.SshNet.Common.SshException or ObjectDisposedException)
                 RemoteSessions.Close(connection.Id);
@@ -501,7 +502,7 @@ public sealed partial class FilePane : UserControl
     {
         int version = ++_remoteVersion;
         string root = ShareRootOf(unc);
-        StatusText.Text = $"{root} açılıyor…";
+        StatusText.Text = Loc.F("{0} açılıyor…", root);
 
         var (ok, error) = await ProbeAsync(unc);
         if (!ok)
@@ -516,13 +517,13 @@ public sealed partial class FilePane : UserControl
             }
             else if (error == "denied")
             {
-                error = "Erişim reddedildi. Kullanıcı adı ve parolayla bağlanmak için Bağlantılar → Yeni bağlantı… ile bu paylaşımı kaydedin.";
+                error = Loc.T("Erişim reddedildi. Kullanıcı adı ve parolayla bağlanmak için Bağlantılar → Yeni bağlantı… ile bu paylaşımı kaydedin.");
             }
         }
         if (version != _remoteVersion) return;
         if (!ok)
         {
-            StatusText.Text = error == "denied" ? "Erişim reddedildi." : error ?? "Ağ konumuna ulaşılamadı.";
+            StatusText.Text = error == "denied" ? Loc.T("Erişim reddedildi.") : error ?? Loc.T("Ağ konumuna ulaşılamadı.");
             return;
         }
         VerifiedShares.Add(root);
@@ -549,7 +550,7 @@ public sealed partial class FilePane : UserControl
             }
         });
         var finished = await Task.WhenAny(probe, Task.Delay(TimeSpan.FromSeconds(12)));
-        return finished == probe ? probe.Result : (false, "Ağ konumu yanıt vermedi (zaman aşımı).");
+        return finished == probe ? probe.Result : (false, Loc.T("Ağ konumu yanıt vermedi (zaman aşımı)."));
     }
 
     private void ConnectionStore_Changed(object? sender, EventArgs e)
@@ -563,7 +564,7 @@ public sealed partial class FilePane : UserControl
         if (Remote is not { } connection || item.RemotePath is null) return;
         try
         {
-            StatusText.Text = $"{item.Name} indiriliyor…";
+            StatusText.Text = Loc.F("{0} indiriliyor…", item.Name);
             var temp = await RemoteFiles.DownloadToTempAsync(connection, item.RemotePath, item.Name, CancellationToken.None);
             ShellActions.Open(temp);
             UpdateStatus();
@@ -613,13 +614,13 @@ public sealed partial class FilePane : UserControl
             GitBranchText.Text = info.Summary;
             GitChangesText.Text = info.HasStatus && info.ChangeCount > 0 ? $"±{info.ChangeCount}" : string.Empty;
             ToolTipService.SetToolTip(GitPill, info.HasStatus
-                ? $"Git: {info.Branch}{(info.HasUpstream ? string.Empty : " (uzak dal yok)")}\n{info.ChangeCount} değişiklik · {info.Root}"
-                : $"Git: {info.Branch}\ngit.exe bulunamadı; dosya durumları gösterilemiyor.");
+                ? Loc.F("Git: {0}{1}\n{2} değişiklik · {3}", info.Branch, (info.HasUpstream ? string.Empty : Loc.T(" (uzak dal yok)")), info.ChangeCount, info.Root)
+                : Loc.F("Git: {0}\ngit.exe bulunamadı; dosya durumları gösterilemiyor.", info.Branch));
             GitPill.Visibility = Visibility.Visible;
         }
         catch (Exception ex)
         {
-            CrashLog.Write("Git durumu", ex);
+            CrashLog.Write(Loc.T("Git durumu"), ex);
             if (version == _gitVersion) ClearGit();
         }
     }
@@ -649,22 +650,22 @@ public sealed partial class FilePane : UserControl
     {
         if (_git is not { } git) return;
         var menu = new MenuFlyout();
-        var changed = new MenuFlyoutItem { Text = "Değişenleri seç", Icon = new FontIcon { Glyph = "\uE762" }, IsEnabled = git.HasStatus };
+        var changed = new MenuFlyoutItem { Text = Loc.T("Değişenleri seç"), Icon = new FontIcon { Glyph = "\uE762" }, IsEnabled = git.HasStatus };
         changed.Click += (_, _) =>
         {
             int count = SelectWhere(i => i.Git is GitState.Modified or GitState.Added or GitState.Deleted or GitState.Untracked or GitState.Conflict);
-            ShowStatus(count == 0 ? "Bu klasörde değişen dosya yok" : $"{count} değişen öğe seçildi");
+            ShowStatus(count == 0 ? Loc.T("Bu klasörde değişen dosya yok") : Loc.F("{0} değişen öğe seçildi", count));
         };
-        var root = new MenuFlyoutItem { Text = "Depo köküne git", Icon = new FontIcon { Glyph = "\uE80F" } };
+        var root = new MenuFlyoutItem { Text = Loc.T("Depo köküne git"), Icon = new FontIcon { Glyph = "\uE80F" } };
         root.Click += (_, _) => Navigate(git.Root);
-        var copy = new MenuFlyoutItem { Text = "Dal adını kopyala", Icon = new FontIcon { Glyph = "\uE8C8" } };
+        var copy = new MenuFlyoutItem { Text = Loc.T("Dal adını kopyala"), Icon = new FontIcon { Glyph = "\uE8C8" } };
         copy.Click += (_, _) =>
         {
             var package = new DataPackage();
             package.SetText(git.Branch);
             Clipboard.SetContent(package);
         };
-        var refresh = new MenuFlyoutItem { Text = "Durumu yenile", Icon = new FontIcon { Glyph = "\uE72C" } };
+        var refresh = new MenuFlyoutItem { Text = Loc.T("Durumu yenile"), Icon = new FontIcon { Glyph = "\uE72C" } };
         refresh.Click += (_, _) => UpdateGit(force: true);
         menu.Items.Add(changed);
         menu.Items.Add(root);
@@ -724,8 +725,8 @@ public sealed partial class FilePane : UserControl
     public async Task SelectByPatternAsync(bool select)
     {
         if (XamlRoot is null) return;
-        var input = await Dialogs.InputAsync(XamlRoot, ActualTheme, select ? "Desenle seç" : "Desenle seçimi kaldır",
-            AppSettings.Current.GetString("Pane.LastPattern", "*.*"), select ? "Seç" : "Kaldır");
+        var input = await Dialogs.InputAsync(XamlRoot, ActualTheme, select ? Loc.T("Desenle seç") : Loc.T("Desenle seçimi kaldır"),
+            AppSettings.Current.GetString("Pane.LastPattern", "*.*"), select ? Loc.T("Seç") : Loc.T("Kaldır"));
         if (input is null) return;
         AppSettings.Current.SetString("Pane.LastPattern", input);
 
@@ -759,7 +760,7 @@ public sealed partial class FilePane : UserControl
     {
         try
         {
-            StatusText.Text = $"{item.Name} çıkarılıyor…";
+            StatusText.Text = Loc.F("{0} çıkarılıyor…", item.Name);
             var temp = await ArchiveService.ExtractToTempAsync(item);
             ShellActions.Open(temp);
             UpdateStatus();
@@ -804,7 +805,7 @@ public sealed partial class FilePane : UserControl
         }
         catch (Exception ex)
         {
-            CrashLog.Write("Bulut klasörleri", ex);
+            CrashLog.Write(Loc.T("Bulut klasörleri"), ex);
         }
         foreach (var connection in ConnectionStore.All)
         {
@@ -824,7 +825,7 @@ public sealed partial class FilePane : UserControl
     private static List<FileItem> LoadFolder(string path, out string normalized)
     {
         var dir = new DirectoryInfo(path);
-        if (!dir.Exists) throw new DirectoryNotFoundException($"Klasör bulunamadı: {path}");
+        if (!dir.Exists) throw new DirectoryNotFoundException(Loc.F("Klasör bulunamadı: {0}", path));
         normalized = dir.FullName;
 
         var list = new List<FileItem>
@@ -952,15 +953,15 @@ public sealed partial class FilePane : UserControl
         {
             long bytes = selected.Where(i => !i.IsDirectory).Sum(i => i.Size ?? 0);
             int folders = selected.Count(i => i.IsDirectory);
-            StatusText.Text = $"{selected.Count} öğe işaretli · {FileItem.FormatSize(bytes)}" + (folders > 0 ? $" ({folders} klasör hariç)" : string.Empty);
+            StatusText.Text = Loc.F("{0} öğe işaretli · {1}", selected.Count, FileItem.FormatSize(bytes)) + (folders > 0 ? Loc.F(" ({0} klasör hariç)", folders) : string.Empty);
             return;
         }
         int dirs = _all.Count(i => i.IsDirectory && !i.IsParent);
         int files = _all.Count(i => !i.IsDirectory);
-        string text = IsDriveList ? $"{dirs} konum" : $"{dirs} klasör, {files} dosya";
+        string text = IsDriveList ? Loc.F("{0} konum", dirs) : Loc.F("{0} klasör, {1} dosya", dirs, files);
         if (IsInArchive) text = $"ZIP · {text}";
         if (Remote is { } remote) text = $"{remote.KindLabel} · {remote.Name} · {text}";
-        if (_filter.Length > 0) text += $" · filtre: {Items.Count(i => !i.IsParent)} eşleşme";
+        if (_filter.Length > 0) text += Loc.F(" · filtre: {0} eşleşme", Items.Count(i => !i.IsParent));
         StatusText.Text = text;
     }
 
@@ -1033,7 +1034,7 @@ public sealed partial class FilePane : UserControl
 
     private void UpdateCrumbs()
     {
-        var names = new List<string> { "Bu bilgisayar" };
+        var names = new List<string> { Loc.T("Bu bilgisayar") };
         _crumbPaths.Clear();
         _crumbPaths.Add(string.Empty);
         if (Remote is { } remote)
@@ -1096,7 +1097,7 @@ public sealed partial class FilePane : UserControl
         if (e.Key != VirtualKey.Enter) return;
         var text = PathBox.Text.Trim().Trim('"');
         EndEditPath();
-        Navigate(text.Length == 0 || text == "Bu bilgisayar" ? string.Empty : Environment.ExpandEnvironmentVariables(text));
+        Navigate(text.Length == 0 || text == Loc.T("Bu bilgisayar") ? string.Empty : Environment.ExpandEnvironmentVariables(text));
         FocusList();
         e.Handled = true;
     }
@@ -1319,89 +1320,89 @@ public sealed partial class FilePane : UserControl
             var selection = SelectedItems;
             bool single = selection.Count <= 1;
 
-            menu.PrimaryCommands.Add(MenuButton("Kes", "", PaneCommand.Cut, "Ctrl+X"));
-            menu.PrimaryCommands.Add(MenuButton("Kopyala", "", PaneCommand.Copy, "Ctrl+C"));
-            menu.PrimaryCommands.Add(MenuButton("Yapıştır", "", PaneCommand.Paste, "Ctrl+V", enabled: canPaste));
-            menu.PrimaryCommands.Add(MenuButton("Yeniden adlandır", "", PaneCommand.Rename, "F2", enabled: single));
-            menu.PrimaryCommands.Add(MenuButton("Sil", "", PaneCommand.Delete, "Del · Shift+Del: kalıcı"));
+            menu.PrimaryCommands.Add(MenuButton(Loc.T("Kes"), "", PaneCommand.Cut, "Ctrl+X"));
+            menu.PrimaryCommands.Add(MenuButton(Loc.T("Kopyala"), "", PaneCommand.Copy, "Ctrl+C"));
+            menu.PrimaryCommands.Add(MenuButton(Loc.T("Yapıştır"), "", PaneCommand.Paste, "Ctrl+V", enabled: canPaste));
+            menu.PrimaryCommands.Add(MenuButton(Loc.T("Yeniden adlandır"), "", PaneCommand.Rename, "F2", enabled: single));
+            menu.PrimaryCommands.Add(MenuButton(Loc.T("Sil"), "", PaneCommand.Delete, Loc.T("Del · Shift+Del: kalıcı")));
 
-            menu.SecondaryCommands.Add(MenuButton("Aç", "", PaneCommand.Open, "Enter"));
+            menu.SecondaryCommands.Add(MenuButton(Loc.T("Aç"), "", PaneCommand.Open, "Enter"));
             if (!item.IsDirectory)
             {
-                menu.SecondaryCommands.Add(MenuButton("Birlikte aç…", "", PaneCommand.OpenWith));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Birlikte aç…"), "", PaneCommand.OpenWith));
             }
             switch (item.Kind)
             {
                 case FileKind.Audio:
-                    menu.SecondaryCommands.Add(MenuButton("Hızlı çal", "", PaneCommand.Play, "Space"));
+                    menu.SecondaryCommands.Add(MenuButton(Loc.T("Hızlı çal"), "", PaneCommand.Play, "Space"));
                     break;
                 case FileKind.Video:
-                    menu.SecondaryCommands.Add(MenuButton("Hızlı oynat", "", PaneCommand.Play, "Space"));
+                    menu.SecondaryCommands.Add(MenuButton(Loc.T("Hızlı oynat"), "", PaneCommand.Play, "Space"));
                     break;
                 case FileKind.Image or FileKind.Pdf or FileKind.Text:
-                    menu.SecondaryCommands.Add(MenuButton("Önizle", "", PaneCommand.Preview, "Space"));
+                    menu.SecondaryCommands.Add(MenuButton(Loc.T("Önizle"), "", PaneCommand.Preview, "Space"));
                     break;
             }
             if (item.Kind == FileKind.Text)
             {
-                menu.SecondaryCommands.Add(MenuButton("Düzenle", "", PaneCommand.Edit, "F4"));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Düzenle"), "", PaneCommand.Edit, "F4"));
             }
             if (single && VsCode.Suits(item) && !IsRemote)
             {
                 // Kurulu değilse görünür ama pasif: kullanıcı özelliğin varlığını bilsin.
-                var vsCode = MenuButton("VS Code ile aç", "\uE943", PaneCommand.OpenInVsCode, enabled: VsCode.IsInstalled);
-                if (!VsCode.IsInstalled) ToolTipService.SetToolTip(vsCode, "Visual Studio Code bulunamadı");
+                var vsCode = MenuButton(Loc.T("VS Code ile aç"), "\uE943", PaneCommand.OpenInVsCode, enabled: VsCode.IsInstalled);
+                if (!VsCode.IsInstalled) ToolTipService.SetToolTip(vsCode, Loc.T("Visual Studio Code bulunamadı"));
                 menu.SecondaryCommands.Add(vsCode);
             }
             if (FileKinds.IsRunnable(item))
             {
-                menu.SecondaryCommands.Add(MenuButton("Yönetici olarak çalıştır", "", PaneCommand.RunAsAdmin));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Yönetici olarak çalıştır"), "", PaneCommand.RunAsAdmin));
             }
             if (item.Kind == FileKind.Archive && !item.IsInArchive && ArchiveService.IsArchive(item.FullPath))
             {
                 menu.SecondaryCommands.Add(new AppBarSeparator());
-                menu.SecondaryCommands.Add(MenuButton("Buraya çıkar", "\uE8B7", PaneCommand.ExtractHere));
-                menu.SecondaryCommands.Add(MenuButton("Karşı panele çıkar", "\uE8DE", PaneCommand.ExtractToOther));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Buraya çıkar"), "\uE8B7", PaneCommand.ExtractHere));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Karşı panele çıkar"), "\uE8DE", PaneCommand.ExtractToOther));
             }
             if (!item.IsInArchive && IsFileSystemFolder)
             {
-                menu.SecondaryCommands.Add(MenuButton("ZIP olarak sıkıştır…", "\uF012", PaneCommand.Compress));
-                menu.SecondaryCommands.Add(MenuButton("Rafa ekle", "\uE7B8", PaneCommand.AddToShelf));
-                menu.SecondaryCommands.Add(MenuButton("Diğer pencereye kopyala", "\uE8A7", PaneCommand.SendToWindow, "Ctrl+Shift+→"));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("ZIP olarak sıkıştır…"), "\uF012", PaneCommand.Compress));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Rafa ekle"), "\uE7B8", PaneCommand.AddToShelf));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Diğer pencereye kopyala"), "\uE8A7", PaneCommand.SendToWindow, "Ctrl+Shift+→"));
             }
 
             menu.SecondaryCommands.Add(new AppBarSeparator());
-            menu.SecondaryCommands.Add(MenuButton("Karşı panele kopyala", "", PaneCommand.CopyToOther, "F5"));
-            menu.SecondaryCommands.Add(MenuButton("Karşı panele taşı", "", PaneCommand.MoveToOther, "F6"));
-            menu.SecondaryCommands.Add(MenuButton("Yolu kopyala", "", PaneCommand.CopyPath, "Ctrl+Shift+C"));
+            menu.SecondaryCommands.Add(MenuButton(Loc.T("Karşı panele kopyala"), "", PaneCommand.CopyToOther, "F5"));
+            menu.SecondaryCommands.Add(MenuButton(Loc.T("Karşı panele taşı"), "", PaneCommand.MoveToOther, "F6"));
+            menu.SecondaryCommands.Add(MenuButton(Loc.T("Yolu kopyala"), "", PaneCommand.CopyPath, "Ctrl+Shift+C"));
             menu.SecondaryCommands.Add(new AppBarSeparator());
             if (item.IsDirectory)
             {
-                menu.SecondaryCommands.Add(MenuButton("Terminalde aç", "", PaneCommand.OpenTerminal));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Terminalde aç"), "", PaneCommand.OpenTerminal));
             }
-            menu.SecondaryCommands.Add(MenuButton("Dosya Gezgini'nde göster", "", PaneCommand.ShowInExplorer));
-            menu.SecondaryCommands.Add(MenuButton("Özellikler", "", PaneCommand.Properties, "Alt+Enter"));
+            menu.SecondaryCommands.Add(MenuButton(Loc.T("Dosya Gezgini'nde göster"), "", PaneCommand.ShowInExplorer));
+            menu.SecondaryCommands.Add(MenuButton(Loc.T("Özellikler"), "", PaneCommand.Properties, "Alt+Enter"));
         }
         else
         {
-            menu.PrimaryCommands.Add(MenuButton("Yapıştır", "", PaneCommand.Paste, "Ctrl+V", enabled: canPaste && !IsDriveList));
-            menu.PrimaryCommands.Add(MenuButton("Yeni klasör", "\uE8F4", PaneCommand.NewFolder, "F7", enabled: IsFileSystemFolder));
-            menu.PrimaryCommands.Add(MenuButton("Yenile", "", PaneCommand.Refresh, "Ctrl+R"));
+            menu.PrimaryCommands.Add(MenuButton(Loc.T("Yapıştır"), "", PaneCommand.Paste, "Ctrl+V", enabled: canPaste && !IsDriveList));
+            menu.PrimaryCommands.Add(MenuButton(Loc.T("Yeni klasör"), "\uE8F4", PaneCommand.NewFolder, "F7", enabled: IsFileSystemFolder));
+            menu.PrimaryCommands.Add(MenuButton(Loc.T("Yenile"), "", PaneCommand.Refresh, "Ctrl+R"));
 
             if (IsFileSystemFolder)
             {
-                var newButton = new AppBarButton { Label = "Yeni", Icon = new FontIcon { Glyph = "\uE710" } };
+                var newButton = new AppBarButton { Label = Loc.T("Yeni"), Icon = new FontIcon { Glyph = "\uE710" } };
                 var newMenu = new MenuFlyout { Placement = FlyoutPlacementMode.RightEdgeAlignedTop, ShouldConstrainToRootBounds = true };
                 NewMenu.Populate(newMenu.Items, entry => _ = Host?.CreateNewAsync(this, entry));
                 newMenu.Opened += (_, _) => CursorHelper.ApplyToOpenPopups(XamlRoot);
                 newButton.Flyout = newMenu;
                 menu.SecondaryCommands.Add(newButton);
                 menu.SecondaryCommands.Add(new AppBarSeparator());
-                menu.SecondaryCommands.Add(MenuButton("Terminalde aç", "", PaneCommand.OpenTerminal));
-                menu.SecondaryCommands.Add(MenuButton("Dosya Gezgini'nde aç", "", PaneCommand.ShowInExplorer));
-                menu.SecondaryCommands.Add(MenuButton("Yolu kopyala", "", PaneCommand.CopyPath));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Terminalde aç"), "", PaneCommand.OpenTerminal));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Dosya Gezgini'nde aç"), "", PaneCommand.ShowInExplorer));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Yolu kopyala"), "", PaneCommand.CopyPath));
                 menu.SecondaryCommands.Add(new AppBarSeparator());
-                menu.SecondaryCommands.Add(MenuButton("Klasör özellikleri", "", PaneCommand.Properties));
+                menu.SecondaryCommands.Add(MenuButton(Loc.T("Klasör özellikleri"), "", PaneCommand.Properties));
             }
         }
         return menu;
@@ -1476,10 +1477,10 @@ public sealed partial class FilePane : UserControl
         e.AcceptedOperation = copy ? DataPackageOperation.Copy : DataPackageOperation.Move;
         var folderName = Path.GetFileName(CurrentPath.TrimEnd('\\'));
         if (folderName.Length == 0) folderName = CurrentPath;
-        e.DragUIOverride.Caption = copy ? $"Kopyala → {folderName}" : $"Taşı → {folderName}";
+        e.DragUIOverride.Caption = copy ? Loc.F("Kopyala → {0}", folderName) : Loc.F("Taşı → {0}", folderName);
         e.DragUIOverride.IsCaptionVisible = true;
 
-        DropHintText.Text = copy ? "Kopyalamak için bırak" : "Taşımak için bırak · Ctrl: kopyala";
+        DropHintText.Text = copy ? Loc.T("Kopyalamak için bırak") : Loc.T("Taşımak için bırak · Ctrl: kopyala");
         DropHint.Visibility = Visibility.Visible;
     }
 

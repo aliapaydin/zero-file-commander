@@ -14,7 +14,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
-    <Version>0.8.2</Version>
+    <Version>0.9.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,6 +24,11 @@
 
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <!-- İngilizce arayüz metinleri (anahtar: Türkçe metin) -->
+  <ItemGroup>
+    <EmbeddedResource Include="Strings\en.json" LogicalName="ZeroFileCommander.Strings.en.json" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">

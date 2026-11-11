@@ -43,7 +43,7 @@ public static class VsCode
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            CrashLog.Write("VS Code açılamadı", ex);
+            CrashLog.Write(Loc.T("VS Code açılamadı"), ex);
             return false;
         }
     }

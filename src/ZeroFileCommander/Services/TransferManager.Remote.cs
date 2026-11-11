@@ -125,7 +125,7 @@ public sealed partial class TransferManager
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         failedRoots.Add(item.Root);
-                        lock (job.Errors) job.Errors.Add($"Klasör oluşturulamadı: {item.Destination}: {ex.Message}");
+                        lock (job.Errors) job.Errors.Add(Loc.F("Klasör oluşturulamadı: {0}: {1}", item.Destination, ex.Message));
                     }
                     continue;
                 }
@@ -220,7 +220,7 @@ public sealed partial class TransferManager
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        lock (job.Errors) job.Errors.Add($"Kaynak silinemedi: {Path.GetFileName(job.Sources[i].TrimEnd('/', '\\'))}: {ex.Message}");
+                        lock (job.Errors) job.Errors.Add(Loc.F("Kaynak silinemedi: {0}: {1}", Path.GetFileName(job.Sources[i].TrimEnd('/', '\\')), ex.Message));
                     }
                 }
             }
@@ -238,13 +238,13 @@ public sealed partial class TransferManager
         {
             lock (job.Errors) job.Errors.Add(ex switch
             {
-                RemoteAuthException => "Oturum açılamadı: " + ex.Message,
-                RemoteHostKeyException => "Sunucu anahtarı doğrulanmadı. Bağlantıyı önce panelde açıp anahtarı onaylayın.",
+                RemoteAuthException => Loc.T("Oturum açılamadı: ") + ex.Message,
+                RemoteHostKeyException => Loc.T("Sunucu anahtarı doğrulanmadı. Bağlantıyı önce panelde açıp anahtarı onaylayın."),
                 _ => ex.Message,
             });
             job.ErrorCount = job.Errors.Count;
             job.State = TransferState.CompletedWithErrors;
-            CrashLog.Write("Uzak aktarım", ex);
+            CrashLog.Write(Loc.T("Uzak aktarım"), ex);
         }
         finally
         {
@@ -259,7 +259,7 @@ public sealed partial class TransferManager
         source is null || destination is null || source.Value > destination.Value.AddSeconds(2);
 
     private static string RemoteTargetPath(string uri) =>
-        RemotePath.TryParse(uri, out _, out var path) ? path : throw new InvalidOperationException("Hedef bağlantı bulunamadı: " + uri);
+        RemotePath.TryParse(uri, out _, out var path) ? path : throw new InvalidOperationException(Loc.T("Hedef bağlantı bulunamadı: ") + uri);
 
     private static async Task<List<RemotePlanItem>> BuildDownloadPlanAsync(TransferJob job, IRemoteSession session, string localTarget, CancellationToken token)
     {
@@ -270,7 +270,7 @@ public sealed partial class TransferManager
             var entry = await session.StatAsync(remote, token);
             if (entry is null)
             {
-                lock (job.Errors) job.Errors.Add($"Bulunamadı: {remote}");
+                lock (job.Errors) job.Errors.Add(Loc.F("Bulunamadı: {0}", remote));
                 continue;
             }
             var destination = Path.Combine(localTarget, SafeLocalName(entry.Name));

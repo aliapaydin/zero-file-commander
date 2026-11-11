@@ -15,6 +15,7 @@ public sealed partial class TransfersWindow : Window
     public TransfersWindow()
     {
         InitializeComponent();
+        Loc.Apply(this); // XAML metinleri seçili dile
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarArea);
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
@@ -45,7 +46,7 @@ public sealed partial class TransfersWindow : Window
         int total = Manager.Jobs.Count;
         int active = Manager.ActiveCount;
         EmptyText.Visibility = total == 0 ? Visibility.Visible : Visibility.Collapsed;
-        SummaryText.Text = total == 0 ? string.Empty : active > 0 ? $"{active} iş sürüyor · toplam {total}" : $"{total} iş tamamlandı";
+        SummaryText.Text = total == 0 ? string.Empty : active > 0 ? Loc.F("{0} iş sürüyor · toplam {1}", active, total) : Loc.F("{0} iş tamamlandı", total);
     }
 
     private void PolicyChoice_SelectionChanged(object sender, SelectionChangedEventArgs e)

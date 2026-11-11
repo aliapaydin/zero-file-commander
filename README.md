@@ -13,7 +13,7 @@
   <a href="https://github.com/aliapaydin/zero-file-commander/actions/workflows/build.yml"><img src="https://github.com/aliapaydin/zero-file-commander/actions/workflows/build.yml/badge.svg" alt="Derleme"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/lisans-MIT-1f6fd6" alt="MIT Lisansı"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-1f6fd6" alt="Windows 10 | 11">
-  <img src="https://img.shields.io/badge/sürüm-0.8.2-1f6fd6" alt="Sürüm 0.8.2">
+  <img src="https://img.shields.io/badge/sürüm-0.9.0-1f6fd6" alt="Sürüm 0.9.0">
   <img src="https://img.shields.io/badge/.NET-10-512bd4" alt=".NET 10">
 </p>
 
@@ -30,7 +30,7 @@
 
 **Zero File Commander**, Total Commander'ın hızını ve çift panel düzenini, Windows 11'in Fluent tasarımıyla buluşturan açık kaynaklı bir dosya yöneticisi. Klavyeyle hızlı çalışmak isteyenler için tasarlandı ama fareyle de rahat kullanılıyor: sürükle-bırak, sağ tık menüsü, şerit menü ve her yerde önizleme.
 
-> **Durum:** Aktif geliştirme aşamasında (v0.8.2). Günlük kullanıma büyük ölçüde hazır; hatalar ve öneriler için [issue açabilirsin](https://github.com/aliapaydin/zero-file-commander/issues/new/choose). Neyin bitip neyin sırada olduğu [yol haritasında](docs/ROADMAP.md).
+> **Durum:** Aktif geliştirme aşamasında (v0.9.0). Günlük kullanıma büyük ölçüde hazır; hatalar ve öneriler için [issue açabilirsin](https://github.com/aliapaydin/zero-file-commander/issues/new/choose). Neyin bitip neyin sırada olduğu [yol haritasında](docs/ROADMAP.md).
 
 ## ✨ Öne çıkanlar
 

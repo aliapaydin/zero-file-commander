@@ -12,7 +12,7 @@ namespace ZeroFileCommander.Views;
 public static class Dialogs
 {
     public static ContentDialog Create(XamlRoot root, ElementTheme theme, string title, object content,
-        string? primary = null, string close = "Kapat", ContentDialogButton defaultButton = ContentDialogButton.Close)
+        string? primary = null, string? close = null, ContentDialogButton defaultButton = ContentDialogButton.Close)
     {
         var dialog = new ContentDialog
         {
@@ -20,7 +20,7 @@ public static class Dialogs
             RequestedTheme = theme,
             Title = title,
             Content = content,
-            CloseButtonText = close,
+            CloseButtonText = close ?? Loc.T("Kapat"),
             DefaultButton = defaultButton,
         };
         if (primary is not null) dialog.PrimaryButtonText = primary;
@@ -29,11 +29,11 @@ public static class Dialogs
     }
 
     public static async Task MessageAsync(XamlRoot root, ElementTheme theme, string title, string message) =>
-        await Create(root, theme, title, new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap }, close: "Tamam").ShowAsync();
+        await Create(root, theme, title, new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap }, close: Loc.T("Tamam")).ShowAsync();
 
     public static async Task<bool> ConfirmAsync(XamlRoot root, ElementTheme theme, string title, string message, string confirm)
     {
-        var dialog = Create(root, theme, title, new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap }, confirm, "Vazgeç");
+        var dialog = Create(root, theme, title, new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap }, confirm, Loc.T("Vazgeç"));
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
@@ -50,7 +50,7 @@ public static class Dialogs
         });
         panel.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 380 });
 
-        var dialog = Create(root, theme, title, panel, confirm, "Vazgeç", ContentDialogButton.Close);
+        var dialog = Create(root, theme, title, panel, confirm, Loc.T("Vazgeç"), ContentDialogButton.Close);
         var danger = new Style(typeof(Button));
         danger.Setters.Add(new Setter(Control.BackgroundProperty, Application.Current.Resources["SystemFillColorCriticalBrush"]));
         danger.Setters.Add(new Setter(Control.ForegroundProperty, new SolidColorBrush(Microsoft.UI.Colors.White)));
@@ -68,7 +68,7 @@ public static class Dialogs
             int length = selectStem && Path.HasExtension(initial) ? Path.GetFileNameWithoutExtension(initial).Length : initial.Length;
             box.Select(0, length);
         };
-        var dialog = Create(root, theme, title, box, confirm, "Vazgeç", ContentDialogButton.Primary);
+        var dialog = Create(root, theme, title, box, confirm, Loc.T("Vazgeç"), ContentDialogButton.Primary);
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return null;
         var text = box.Text.Trim();
         return text.Length == 0 ? null : text;
@@ -97,16 +97,16 @@ public static class Dialogs
 
         FileSystemInfo info = item.IsDirectory ? new DirectoryInfo(item.FullPath) : new FileInfo(item.FullPath);
         AddRow("Ad", item.Name);
-        AddRow("Tür", item.IsDirectory ? "Klasör" : $"{FileKinds.Label(item.Kind)} (.{item.Extension.ToLowerInvariant()})");
-        AddRow("Konum", Path.GetDirectoryName(item.FullPath) ?? item.FullPath);
-        var sizeText = AddRow("Boyut", item.IsDirectory ? "Hesaplanıyor…" : $"{item.SizeText} ({item.Size:N0} bayt)");
-        TextBlock? countText = item.IsDirectory ? AddRow("İçerik", "Hesaplanıyor…") : null;
+        AddRow(Loc.T("Tür"), item.IsDirectory ? Loc.T("Klasör") : $"{FileKinds.Label(item.Kind)} (.{item.Extension.ToLowerInvariant()})");
+        AddRow(Loc.T("Konum"), Path.GetDirectoryName(item.FullPath) ?? item.FullPath);
+        var sizeText = AddRow(Loc.T("Boyut"), item.IsDirectory ? Loc.T("Hesaplanıyor…") : Loc.F("{0} ({1:N0} bayt)", item.SizeText, item.Size));
+        TextBlock? countText = item.IsDirectory ? AddRow(Loc.T("İçerik"), Loc.T("Hesaplanıyor…")) : null;
         try
         {
-            AddRow("Oluşturulma", info.CreationTime.ToString("dd.MM.yyyy HH:mm:ss"));
-            AddRow("Değiştirilme", info.LastWriteTime.ToString("dd.MM.yyyy HH:mm:ss"));
-            AddRow("Erişim", info.LastAccessTime.ToString("dd.MM.yyyy HH:mm:ss"));
-            AddRow("Öznitelikler", Attributes(info.Attributes));
+            AddRow(Loc.T("Oluşturulma"), info.CreationTime.ToString("dd.MM.yyyy HH:mm:ss"));
+            AddRow(Loc.T("Değiştirilme"), info.LastWriteTime.ToString("dd.MM.yyyy HH:mm:ss"));
+            AddRow(Loc.T("Erişim"), info.LastAccessTime.ToString("dd.MM.yyyy HH:mm:ss"));
+            AddRow(Loc.T("Öznitelikler"), Attributes(info.Attributes));
         }
         catch
         {
@@ -115,7 +115,7 @@ public static class Dialogs
 
         if (item.Kind == FileKind.Image)
         {
-            var dims = AddRow("Boyutlar", "…");
+            var dims = AddRow(Loc.T("Boyutlar"), "…");
             var dq = dims.DispatcherQueue;
             _ = Task.Run(async () =>
             {
@@ -123,7 +123,7 @@ public static class Dialogs
                 {
                     var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(item.FullPath);
                     var props = await file.Properties.GetImagePropertiesAsync();
-                    dq.TryEnqueue(() => dims.Text = $"{props.Width} × {props.Height} piksel");
+                    dq.TryEnqueue(() => dims.Text = Loc.F("{0} × {1} piksel", props.Width, props.Height));
                 }
                 catch
                 {
@@ -134,7 +134,7 @@ public static class Dialogs
 
         var panel = new StackPanel { Spacing = 16 };
         panel.Children.Add(grid);
-        var windowsProps = new HyperlinkButton { Content = "Windows özellikler penceresini aç", Padding = new Thickness(0) };
+        var windowsProps = new HyperlinkButton { Content = Loc.T("Windows özellikler penceresini aç"), Padding = new Thickness(0) };
         windowsProps.Click += (_, _) => ShellActions.ShowWindowsProperties(item.FullPath);
         panel.Children.Add(windowsProps);
 
@@ -144,7 +144,7 @@ public static class Dialogs
             _ = FillFolderAsync(item.FullPath, sizeText, countText!, cts.Token);
         }
 
-        await Create(root, theme, "Özellikler", panel).ShowAsync();
+        await Create(root, theme, Loc.T("Özellikler"), panel).ShowAsync();
         cts.Cancel();
     }
 
@@ -153,29 +153,29 @@ public static class Dialogs
         try
         {
             var (folders, files, capped) = await FilePreview.CountAsync(path);
-            count.Text = capped ? "10.000+ öğe" : $"{folders} klasör, {files} dosya";
+            count.Text = capped ? Loc.T("10.000+ öğe") : Loc.F("{0} klasör, {1} dosya", folders, files);
             long bytes = await FilePreview.FolderSizeAsync(path, token);
-            size.Text = $"{FileItem.FormatSize(bytes)} ({bytes:N0} bayt)";
+            size.Text = Loc.F("{0} ({1:N0} bayt)", FileItem.FormatSize(bytes), bytes);
         }
         catch (OperationCanceledException)
         {
         }
         catch
         {
-            size.Text = "Hesaplanamadı";
+            size.Text = Loc.T("Hesaplanamadı");
         }
     }
 
     private static string Attributes(FileAttributes a)
     {
         var parts = new List<string>();
-        if (a.HasFlag(FileAttributes.ReadOnly)) parts.Add("Salt okunur");
-        if (a.HasFlag(FileAttributes.Hidden)) parts.Add("Gizli");
-        if (a.HasFlag(FileAttributes.System)) parts.Add("Sistem");
-        if (a.HasFlag(FileAttributes.Archive)) parts.Add("Arşiv");
-        if (a.HasFlag(FileAttributes.Compressed)) parts.Add("Sıkıştırılmış");
-        if (a.HasFlag(FileAttributes.Encrypted)) parts.Add("Şifreli");
-        if (a.HasFlag(FileAttributes.ReparsePoint)) parts.Add("Bağlantı");
+        if (a.HasFlag(FileAttributes.ReadOnly)) parts.Add(Loc.T("Salt okunur"));
+        if (a.HasFlag(FileAttributes.Hidden)) parts.Add(Loc.T("Gizli"));
+        if (a.HasFlag(FileAttributes.System)) parts.Add(Loc.T("Sistem"));
+        if (a.HasFlag(FileAttributes.Archive)) parts.Add(Loc.T("Arşiv"));
+        if (a.HasFlag(FileAttributes.Compressed)) parts.Add(Loc.T("Sıkıştırılmış"));
+        if (a.HasFlag(FileAttributes.Encrypted)) parts.Add(Loc.T("Şifreli"));
+        if (a.HasFlag(FileAttributes.ReparsePoint)) parts.Add(Loc.T("Bağlantı"));
         return parts.Count == 0 ? "—" : string.Join(", ", parts);
     }
 
@@ -195,7 +195,7 @@ public static class Dialogs
         titles.Children.Add(new TextBlock { Text = "Zero File Commander", Style = (Style)Application.Current.Resources["SubtitleTextBlockStyle"] });
         titles.Children.Add(new TextBlock
         {
-            Text = $"Sürüm {version.Major}.{version.Minor}.{version.Build}",
+            Text = Loc.F("Sürüm {0}.{1}.{2}", version.Major, version.Minor, version.Build),
             Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
         });
         header.Children.Add(titles);
@@ -203,58 +203,58 @@ public static class Dialogs
 
         panel.Children.Add(new TextBlock
         {
-            Text = "Klasik çift panelli dosya yöneticilerinin gücü, modern Windows 11 tadında. Sıfır gecikmeyle dosya yönetimi.",
+            Text = Loc.T("Klasik çift panelli dosya yöneticilerinin gücü, modern Windows 11 tadında. Sıfır gecikmeyle dosya yönetimi."),
             TextWrapping = TextWrapping.Wrap,
         });
 
         var links = new StackPanel { Spacing = 0 };
-        links.Children.Add(new HyperlinkButton { Content = "GitHub'da kaynak kod", NavigateUri = new Uri("https://github.com/aliapaydin/zero-file-commander"), Padding = new Thickness(0, 4, 0, 4) });
-        links.Children.Add(new HyperlinkButton { Content = "Hata bildir / özellik iste", NavigateUri = new Uri("https://github.com/aliapaydin/zero-file-commander/issues"), Padding = new Thickness(0, 4, 0, 4) });
+        links.Children.Add(new HyperlinkButton { Content = Loc.T("GitHub'da kaynak kod"), NavigateUri = new Uri("https://github.com/aliapaydin/zero-file-commander"), Padding = new Thickness(0, 4, 0, 4) });
+        links.Children.Add(new HyperlinkButton { Content = Loc.T("Hata bildir / özellik iste"), NavigateUri = new Uri("https://github.com/aliapaydin/zero-file-commander/issues"), Padding = new Thickness(0, 4, 0, 4) });
         panel.Children.Add(links);
 
         var license = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"] };
-        license.Inlines.Add(new Run { Text = "MIT lisansı ile açık kaynak. © 2026 Ali Apaydın" });
+        license.Inlines.Add(new Run { Text = Loc.T("MIT lisansı ile açık kaynak. © 2026 Ali Apaydın") });
         panel.Children.Add(license);
 
-        await Create(root, theme, "Hakkında", panel).ShowAsync();
+        await Create(root, theme, Loc.T("Hakkında"), panel).ShowAsync();
     }
 
     public static async Task ShortcutsAsync(XamlRoot root, ElementTheme theme)
     {
         (string Key, string Action)[] rows =
         [
-            ("Tab", "Paneller arasında geç"),
-            ("Enter / çift tık", "Aç"),
-            ("Backspace", "Üst klasör"),
-            ("Space", "Önizle / hızlı çal"),
-            ("F2", "Yeniden adlandır"),
-            ("F3 / F4", "Görüntüle / düzenle"),
-            ("F5 / F6", "Karşı panele kopyala / taşı"),
-            ("F7", "Yeni klasör"),
-            ("F8 / Del", "Geri Dönüşüm Kutusu'na gönder"),
-            ("Shift+Del", "Kalıcı olarak sil (onay ister)"),
-            ("Ctrl+C / X / V", "Kopyala / kes / yapıştır"),
-            ("Ctrl+Shift+C", "Yolu kopyala"),
-            ("Alt+Enter", "Özellikler"),
-            ("Ctrl+R", "Yenile"),
-            ("Ctrl+Q", "Önizleme panelini aç/kapat"),
-            ("Ctrl+Shift+E", "Klasör ağacını aç/kapat"),
-            ("Ctrl+J", "İndirmeler"),
-            ("Ctrl+K", "Komut paleti"),
-            ("Ctrl+N", "Yeni pencere"),
-            ("Ctrl+Shift+→", "Seçimi diğer pencereye kopyala"),
-            ("Ctrl+Shift+S", "Raf (geçici toplama alanı)"),
-            ("Ctrl+T / Ctrl+W", "Yeni sekme / sekmeyi kapat"),
-            ("Ctrl+Tab", "Sonraki sekme"),
-            ("Ctrl+L", "Yolu yazarak düzenle"),
-            ("Ctrl+M", "Toplu yeniden adlandır"),
-            ("Alt+F7", "Ara"),
-            ("Insert", "İşaretle ve aşağı in"),
-            ("Num + / − / *", "Desenle seç / kaldır / tersine çevir"),
-            ("Harf yaz", "Listeyi filtrele (Esc temizler)"),
-            ("Enter (ZIP)", "Arşivin içine gir"),
-            ("Ctrl+,", "Ayarlar"),
-            ("Sürükle", "Taşı (Ctrl basılıyken kopyala)"),
+            ("Tab", Loc.T("Paneller arasında geç")),
+            (Loc.T("Enter / çift tık"), Loc.T("Aç")),
+            ("Backspace", Loc.T("Üst klasör")),
+            ("Space", Loc.T("Önizle / hızlı çal")),
+            ("F2", Loc.T("Yeniden adlandır")),
+            ("F3 / F4", Loc.T("Görüntüle / düzenle")),
+            ("F5 / F6", Loc.T("Karşı panele kopyala / taşı")),
+            ("F7", Loc.T("Yeni klasör")),
+            ("F8 / Del", Loc.T("Geri Dönüşüm Kutusu'na gönder")),
+            ("Shift+Del", Loc.T("Kalıcı olarak sil (onay ister)")),
+            ("Ctrl+C / X / V", Loc.T("Kopyala / kes / yapıştır")),
+            ("Ctrl+Shift+C", Loc.T("Yolu kopyala")),
+            ("Alt+Enter", Loc.T("Özellikler")),
+            ("Ctrl+R", Loc.T("Yenile")),
+            ("Ctrl+Q", Loc.T("Önizleme panelini aç/kapat")),
+            ("Ctrl+Shift+E", Loc.T("Klasör ağacını aç/kapat")),
+            ("Ctrl+J", Loc.T("İndirmeler")),
+            ("Ctrl+K", Loc.T("Komut paleti")),
+            ("Ctrl+N", Loc.T("Yeni pencere")),
+            ("Ctrl+Shift+→", Loc.T("Seçimi diğer pencereye kopyala")),
+            ("Ctrl+Shift+S", Loc.T("Raf (geçici toplama alanı)")),
+            ("Ctrl+T / Ctrl+W", Loc.T("Yeni sekme / sekmeyi kapat")),
+            ("Ctrl+Tab", Loc.T("Sonraki sekme")),
+            ("Ctrl+L", Loc.T("Yolu yazarak düzenle")),
+            ("Ctrl+M", Loc.T("Toplu yeniden adlandır")),
+            ("Alt+F7", Loc.T("Ara")),
+            ("Insert", Loc.T("İşaretle ve aşağı in")),
+            ("Num + / − / *", Loc.T("Desenle seç / kaldır / tersine çevir")),
+            (Loc.T("Harf yaz"), Loc.T("Listeyi filtrele (Esc temizler)")),
+            ("Enter (ZIP)", Loc.T("Arşivin içine gir")),
+            ("Ctrl+,", Loc.T("Ayarlar")),
+            (Loc.T("Sürükle"), Loc.T("Taşı (Ctrl basılıyken kopyala)")),
         ];
 
         var grid = new Grid { ColumnSpacing = 20, RowSpacing = 6, Width = 420 };
@@ -271,6 +271,6 @@ public static class Dialogs
             grid.Children.Add(key);
             grid.Children.Add(action);
         }
-        await Create(root, theme, "Klavye kısayolları", new ScrollViewer { Content = grid, MaxHeight = 480 }).ShowAsync();
+        await Create(root, theme, Loc.T("Klavye kısayolları"), new ScrollViewer { Content = grid, MaxHeight = 480 }).ShowAsync();
     }
 }

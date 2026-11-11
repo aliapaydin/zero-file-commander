@@ -23,7 +23,7 @@ public static class AppLock
     /// <summary>Özet arka planda hesaplanır; ayar çağıran (arayüz) iş parçacığında yazılır.</summary>
     public static async Task SetPinAsync(string pin)
     {
-        if (!IsValidPin(pin)) throw new ArgumentException("PIN 4 rakam olmalı.", nameof(pin));
+        if (!IsValidPin(pin)) throw new ArgumentException(Loc.T("PIN 4 rakam olmalı."), nameof(pin));
         var salt = RandomNumberGenerator.GetBytes(16);
         var hash = await Task.Run(() => Derive(pin, salt));
         AppSettings.Current.SetString(SaltKey, Convert.ToBase64String(salt));

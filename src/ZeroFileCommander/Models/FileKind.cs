@@ -1,3 +1,4 @@
+using ZeroFileCommander.Services;
 namespace ZeroFileCommander.Models;
 
 public enum FileKind
@@ -66,16 +67,16 @@ public static class FileKinds
 
     public static string Label(FileKind kind) => kind switch
     {
-        FileKind.Folder => "Klasör",
-        FileKind.Image => "Görsel",
-        FileKind.Audio => "Ses",
+        FileKind.Folder => Loc.T("Klasör"),
+        FileKind.Image => Loc.T("Görsel"),
+        FileKind.Audio => Loc.T("Ses"),
         FileKind.Video => "Video",
         FileKind.Pdf => "PDF",
-        FileKind.Text => "Metin / kod",
-        FileKind.Archive => "Arşiv",
-        FileKind.Executable => "Uygulama",
-        FileKind.Office => "Office belgesi",
-        _ => "Dosya",
+        FileKind.Text => Loc.T("Metin / kod"),
+        FileKind.Archive => Loc.T("Arşiv"),
+        FileKind.Executable => Loc.T("Uygulama"),
+        FileKind.Office => Loc.T("Office belgesi"),
+        _ => Loc.T("Dosya"),
     };
 
     public static string Glyph(FileKind kind) => kind switch

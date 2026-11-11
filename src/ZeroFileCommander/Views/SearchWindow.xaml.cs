@@ -33,6 +33,7 @@ public sealed partial class SearchWindow : Window
     public SearchWindow(string folder)
     {
         InitializeComponent();
+        Loc.Apply(this); // XAML metinleri seçili dile
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarArea);
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
@@ -71,7 +72,7 @@ public sealed partial class SearchWindow : Window
         var root = FolderBox.Text.Trim();
         if (!Directory.Exists(root))
         {
-            StatusText.Text = "Klasör bulunamadı.";
+            StatusText.Text = Loc.T("Klasör bulunamadı.");
             return;
         }
 
@@ -92,7 +93,7 @@ public sealed partial class SearchWindow : Window
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
         SearchIcon.Glyph = "";
-        SearchLabel.Text = "Durdur";
+        SearchLabel.Text = Loc.T("Durdur");
         _drainTimer.Start();
         var started = DateTime.Now;
 
@@ -100,12 +101,12 @@ public sealed partial class SearchWindow : Window
         {
             await Task.Run(() => Scan(root, nameRegexes, content, comparison, recursive, folders, token), token);
             Drain();
-            StatusText.Text = $"{Results.Count} sonuç · {_scanned:N0} öğe tarandı · {(DateTime.Now - started).TotalSeconds:0.0} sn";
+            StatusText.Text = Loc.F("{0} sonuç · {1:N0} öğe tarandı · {2:0.0} sn", Results.Count, _scanned, (DateTime.Now - started).TotalSeconds);
         }
         catch (OperationCanceledException)
         {
             Drain();
-            StatusText.Text = $"Durduruldu · {Results.Count} sonuç";
+            StatusText.Text = Loc.F("Durduruldu · {0} sonuç", Results.Count);
         }
         finally
         {
@@ -113,7 +114,7 @@ public sealed partial class SearchWindow : Window
             _cts.Dispose();
             _cts = null;
             SearchIcon.Glyph = "";
-            SearchLabel.Text = "Ara";
+            SearchLabel.Text = Loc.T("Ara");
         }
     }
 
@@ -190,7 +191,7 @@ public sealed partial class SearchWindow : Window
         if (_cts is not null)
         {
             var folder = _currentFolder;
-            StatusText.Text = $"{Results.Count} sonuç · {_scanned:N0} öğe tarandı · {folder}";
+            StatusText.Text = Loc.F("{0} sonuç · {1:N0} öğe tarandı · {2}", Results.Count, _scanned, folder);
         }
     }
 

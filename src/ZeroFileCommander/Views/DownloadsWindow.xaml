@@ -71,12 +71,12 @@
                                 Visibility="{x:Bind ProgressVisibility, Mode=OneWay}" />
                             <TextBlock Grid.Row="2" Grid.Column="1" Text="{x:Bind StatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                             <StackPanel Grid.Column="2" Grid.RowSpan="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <Button Click="Pause_Click" Visibility="{x:Bind PauseVisibility, Mode=OneWay}" ToolTipService.ToolTip="Duraklat" AutomationProperties.Name="Duraklat"><FontIcon Glyph="&#xE769;" FontSize="13" /></Button>
-                                <Button Click="Resume_Click" Visibility="{x:Bind ResumeVisibility, Mode=OneWay}" ToolTipService.ToolTip="Devam et" AutomationProperties.Name="Devam et"><FontIcon Glyph="&#xE768;" FontSize="13" /></Button>
-                                <Button Click="Open_Click" Visibility="{x:Bind OpenVisibility, Mode=OneWay}" ToolTipService.ToolTip="Aç" AutomationProperties.Name="Aç"><FontIcon Glyph="&#xE8E5;" FontSize="13" /></Button>
-                                <Button Click="ShowInFolder_Click" Visibility="{x:Bind OpenVisibility, Mode=OneWay}" ToolTipService.ToolTip="Klasörde göster" AutomationProperties.Name="Klasörde göster"><FontIcon Glyph="&#xE838;" FontSize="13" /></Button>
-                                <Button Click="Cancel_Click" Visibility="{x:Bind CancelVisibility, Mode=OneWay}" ToolTipService.ToolTip="İptal" AutomationProperties.Name="İptal"><FontIcon Glyph="&#xE711;" FontSize="13" /></Button>
-                                <Button Click="Remove_Click" ToolTipService.ToolTip="Listeden kaldır" AutomationProperties.Name="Listeden kaldır"><FontIcon Glyph="&#xE74D;" FontSize="13" /></Button>
+                                <Button Click="Pause_Click" Visibility="{x:Bind PauseVisibility, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind services:Loc.T('Duraklat')}" AutomationProperties.Name="{x:Bind services:Loc.T('Duraklat')}"><FontIcon Glyph="&#xE769;" FontSize="13" /></Button>
+                                <Button Click="Resume_Click" Visibility="{x:Bind ResumeVisibility, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind services:Loc.T('Devam et')}" AutomationProperties.Name="{x:Bind services:Loc.T('Devam et')}"><FontIcon Glyph="&#xE768;" FontSize="13" /></Button>
+                                <Button Click="Open_Click" Visibility="{x:Bind OpenVisibility, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind services:Loc.T('Aç')}" AutomationProperties.Name="{x:Bind services:Loc.T('Aç')}"><FontIcon Glyph="&#xE8E5;" FontSize="13" /></Button>
+                                <Button Click="ShowInFolder_Click" Visibility="{x:Bind OpenVisibility, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind services:Loc.T('Klasörde göster')}" AutomationProperties.Name="{x:Bind services:Loc.T('Klasörde göster')}"><FontIcon Glyph="&#xE838;" FontSize="13" /></Button>
+                                <Button Click="Cancel_Click" Visibility="{x:Bind CancelVisibility, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind services:Loc.T('İptal')}" AutomationProperties.Name="{x:Bind services:Loc.T('İptal')}"><FontIcon Glyph="&#xE711;" FontSize="13" /></Button>
+                                <Button Click="Remove_Click" ToolTipService.ToolTip="{x:Bind services:Loc.T('Listeden kaldır')}" AutomationProperties.Name="{x:Bind services:Loc.T('Listeden kaldır')}"><FontIcon Glyph="&#xE74D;" FontSize="13" /></Button>
                             </StackPanel>
                         </Grid>
                     </Border>

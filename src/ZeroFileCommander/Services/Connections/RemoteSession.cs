@@ -13,7 +13,7 @@ public sealed record RemoteEntry(string Name, string Path, bool IsDirectory, lon
 public sealed class RemoteHostKeyException : Exception
 {
     public RemoteHostKeyException(string fingerprint, string algorithm, bool mismatch)
-        : base(mismatch ? "Sunucu anahtarı değişmiş" : "Sunucu anahtarı doğrulanmadı")
+        : base(mismatch ? Loc.T("Sunucu anahtarı değişmiş") : Loc.T("Sunucu anahtarı doğrulanmadı"))
     {
         Fingerprint = fingerprint;
         Algorithm = algorithm;
@@ -252,7 +252,7 @@ internal sealed class SftpSession : IRemoteSession
             if (seenKey is not null && !string.Equals(connection.HostKey, seenKey, StringComparison.Ordinal))
                 throw new RemoteHostKeyException(seenKey, seenAlgorithm ?? "?", mismatch: connection.HostKey is not null);
             if (ex is Renci.SshNet.Common.SshAuthenticationException)
-                throw new RemoteAuthException("Kullanıcı adı, parola ya da anahtar kabul edilmedi.", ex);
+                throw new RemoteAuthException(Loc.T("Kullanıcı adı, parola ya da anahtar kabul edilmedi."), ex);
             throw new IOException(Friendly(ex), ex);
         }
         return new SftpSession(connection, client);
@@ -263,7 +263,7 @@ internal sealed class SftpSession : IRemoteSession
         string password = ConnectionStore.GetPassword(connection) ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(connection.KeyFile))
         {
-            if (!File.Exists(connection.KeyFile)) throw new FileNotFoundException("Anahtar dosyası bulunamadı: " + connection.KeyFile);
+            if (!File.Exists(connection.KeyFile)) throw new FileNotFoundException(Loc.T("Anahtar dosyası bulunamadı: ") + connection.KeyFile);
             try
             {
                 // Parola alanı anahtar parolası olarak da kullanılır.
@@ -272,7 +272,7 @@ internal sealed class SftpSession : IRemoteSession
             }
             catch (Renci.SshNet.Common.SshException ex)
             {
-                throw new RemoteAuthException("Anahtar dosyası açılamadı (parolası yanlış ya da biçimi desteklenmiyor).", ex);
+                throw new RemoteAuthException(Loc.T("Anahtar dosyası açılamadı (parolası yanlış ya da biçimi desteklenmiyor)."), ex);
             }
         }
         return new SftpClient(connection.Host, connection.EffectivePort, connection.User, password);
@@ -280,8 +280,8 @@ internal sealed class SftpSession : IRemoteSession
 
     private static string Friendly(Exception ex) => ex switch
     {
-        System.Net.Sockets.SocketException s => $"Sunucuya ulaşılamadı ({s.SocketErrorCode}).",
-        Renci.SshNet.Common.SshOperationTimeoutException => "Sunucu zamanında yanıt vermedi.",
+        System.Net.Sockets.SocketException s => Loc.F("Sunucuya ulaşılamadı ({0}).", s.SocketErrorCode),
+        Renci.SshNet.Common.SshOperationTimeoutException => Loc.T("Sunucu zamanında yanıt vermedi."),
         _ => ex.Message,
     };
 
@@ -298,11 +298,11 @@ internal sealed class SftpSession : IRemoteSession
         }
         catch (Renci.SshNet.Common.SftpPathNotFoundException ex)
         {
-            throw new DirectoryNotFoundException("Uzak yol bulunamadı.", ex);
+            throw new DirectoryNotFoundException(Loc.T("Uzak yol bulunamadı."), ex);
         }
         catch (Renci.SshNet.Common.SftpPermissionDeniedException ex)
         {
-            throw new UnauthorizedAccessException("Sunucu bu işleme izin vermedi.", ex);
+            throw new UnauthorizedAccessException(Loc.T("Sunucu bu işleme izin vermedi."), ex);
         }
         finally
         {
@@ -433,10 +433,10 @@ internal sealed class FtpSession : IRemoteSession
         {
             await client.DisposeAsync();
             if (ex is FtpAuthenticationException)
-                throw new RemoteAuthException("Kullanıcı adı ya da parola kabul edilmedi.", ex);
+                throw new RemoteAuthException(Loc.T("Kullanıcı adı ya da parola kabul edilmedi."), ex);
             if (ex is System.Security.Authentication.AuthenticationException)
-                throw new IOException("Sunucunun TLS sertifikası doğrulanamadı.", ex);
-            throw new IOException(ex is System.Net.Sockets.SocketException s ? $"Sunucuya ulaşılamadı ({s.SocketErrorCode})." : ex.Message, ex);
+                throw new IOException(Loc.T("Sunucunun TLS sertifikası doğrulanamadı."), ex);
+            throw new IOException(ex is System.Net.Sockets.SocketException s ? Loc.F("Sunucuya ulaşılamadı ({0}).", s.SocketErrorCode) : ex.Message, ex);
         }
         return new FtpSession(connection, client);
     }
@@ -451,7 +451,7 @@ internal sealed class FtpSession : IRemoteSession
         }
         catch (FtpCommandException ex) when (ex.CompletionCode is "550")
         {
-            throw new IOException("Sunucu isteği reddetti: " + ex.Message, ex);
+            throw new IOException(Loc.T("Sunucu isteği reddetti: ") + ex.Message, ex);
         }
         finally
         {
@@ -489,13 +489,13 @@ internal sealed class FtpSession : IRemoteSession
     public Task DownloadAsync(string path, Stream destination, CancellationToken token) => RunAsync(async () =>
     {
         if (!await _client.DownloadStream(destination, path, 0, null, token))
-            throw new IOException("İndirme tamamlanamadı: " + path);
+            throw new IOException(Loc.T("İndirme tamamlanamadı: ") + path);
     }, token);
 
     public Task UploadAsync(Stream source, string path, CancellationToken token) => RunAsync(async () =>
     {
         var status = await _client.UploadStream(source, path, FtpRemoteExists.Overwrite, false, null, token);
-        if (status == FtpStatus.Failed) throw new IOException("Yükleme tamamlanamadı: " + path);
+        if (status == FtpStatus.Failed) throw new IOException(Loc.T("Yükleme tamamlanamadı: ") + path);
     }, token);
 
     public Task CreateDirectoryAsync(string path, CancellationToken token) =>

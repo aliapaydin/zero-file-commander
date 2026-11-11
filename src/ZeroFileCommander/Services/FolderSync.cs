@@ -53,12 +53,12 @@ public sealed class SyncEntry : INotifyPropertyChanged
 
     public string StateText => State switch
     {
-        SyncState.Same => "Aynı",
-        SyncState.LeftOnly => "Yalnızca solda",
-        SyncState.RightOnly => "Yalnızca sağda",
-        SyncState.LeftNewer => "Solda daha yeni",
-        SyncState.RightNewer => "Sağda daha yeni",
-        _ => "Farklı",
+        SyncState.Same => Loc.T("Aynı"),
+        SyncState.LeftOnly => Loc.T("Yalnızca solda"),
+        SyncState.RightOnly => Loc.T("Yalnızca sağda"),
+        SyncState.LeftNewer => Loc.T("Solda daha yeni"),
+        SyncState.RightNewer => Loc.T("Sağda daha yeni"),
+        _ => Loc.T("Farklı"),
     };
 
     public string ActionGlyph => Action switch
@@ -70,9 +70,9 @@ public sealed class SyncEntry : INotifyPropertyChanged
 
     public string ActionText => Action switch
     {
-        SyncAction.CopyRight => "Sağa kopyala",
-        SyncAction.CopyLeft => "Sola kopyala",
-        _ => State == SyncState.Same ? "Aynı" : "Atla",
+        SyncAction.CopyRight => Loc.T("Sağa kopyala"),
+        SyncAction.CopyLeft => Loc.T("Sola kopyala"),
+        _ => State == SyncState.Same ? Loc.T("Aynı") : Loc.T("Atla"),
     };
 
     public Visibility FolderVisibility => IsDirectory ? Visibility.Visible : Visibility.Collapsed;
@@ -96,7 +96,7 @@ public sealed class SyncEntry : INotifyPropertyChanged
     private string Describe(long? size, DateTime? time, bool missing)
     {
         if (missing) return "—";
-        var sizeText = IsDirectory ? "Klasör" : Models.FileItem.FormatSize(size ?? 0);
+        var sizeText = IsDirectory ? Loc.T("Klasör") : Models.FileItem.FormatSize(size ?? 0);
         return time is null ? sizeText : $"{sizeText} · {time:dd.MM.yyyy HH:mm}";
     }
 }

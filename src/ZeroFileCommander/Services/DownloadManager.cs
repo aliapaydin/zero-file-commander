@@ -62,14 +62,14 @@ public sealed class DownloadItem : INotifyPropertyChanged
 
     public string StatusText => State switch
     {
-        DownloadState.Queued => "Sırada",
+        DownloadState.Queued => Loc.T("Sırada"),
         DownloadState.Downloading => TotalBytes is > 0
             ? $"{DownloadManager.FormatSize(ReceivedBytes)} / {DownloadManager.FormatSize(TotalBytes.Value)} · {SpeedText}"
             : $"{DownloadManager.FormatSize(ReceivedBytes)} · {SpeedText}",
-        DownloadState.Paused => $"Duraklatıldı · {DownloadManager.FormatSize(ReceivedBytes)}",
-        DownloadState.Completed => $"Tamamlandı · {DownloadManager.FormatSize(ReceivedBytes)}",
-        DownloadState.Failed => $"Başarısız: {Error}",
-        DownloadState.Canceled => "İptal edildi",
+        DownloadState.Paused => Loc.F("Duraklatıldı · {0}", DownloadManager.FormatSize(ReceivedBytes)),
+        DownloadState.Completed => Loc.F("Tamamlandı · {0}", DownloadManager.FormatSize(ReceivedBytes)),
+        DownloadState.Failed => Loc.F("Başarısız: {0}", Error),
+        DownloadState.Canceled => Loc.T("İptal edildi"),
         _ => string.Empty,
     };
 
@@ -347,7 +347,7 @@ public sealed class DownloadManager
             if (!string.IsNullOrWhiteSpace(last)) return Sanitize(last);
             return Sanitize(uri.Host) + ".download";
         }
-        return "indirme";
+        return Loc.T("indirme");
     }
 
     private static string Sanitize(string name)

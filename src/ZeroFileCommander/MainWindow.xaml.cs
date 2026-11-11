@@ -48,6 +48,7 @@ public sealed partial class MainWindow : Window, IPaneHost
     {
         _isPrimary = isPrimary;
         InitializeComponent();
+        Loc.Apply(this); // XAML metinleri seçili dile
         All.Add(this);
 
         ExtendsContentIntoTitleBar = true;
@@ -240,7 +241,7 @@ public sealed partial class MainWindow : Window, IPaneHost
             }
             catch (Exception ex)
             {
-                CrashLog.Write("Uzak önizleme", ex);
+                CrashLog.Write(Loc.T("Uzak önizleme"), ex);
                 return null;
             }
         }
@@ -377,8 +378,8 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (pane.IsInArchive && command is PaneCommand.Rename or PaneCommand.NewFolder or PaneCommand.Cut
                 or PaneCommand.OpenTerminal or PaneCommand.RunAsAdmin or PaneCommand.MoveToOther or PaneCommand.Compress)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Arşiv içinde yapılamıyor",
-                "Bu işlem ZIP'in içinde desteklenmiyor. Dosyaları önce karşı panele çıkarın (F5).");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Arşiv içinde yapılamıyor"),
+                Loc.T("Bu işlem ZIP'in içinde desteklenmiyor. Dosyaları önce karşı panele çıkarın (F5)."));
             return;
         }
 
@@ -414,12 +415,12 @@ public sealed partial class MainWindow : Window, IPaneHost
                     Directory.CreateDirectory(tempFolder);
                     await ArchiveService.ExtractAsync(selection, tempFolder, OverwriteMode.Overwrite);
                     await ClipboardService.SetFilesAsync(Directory.EnumerateFileSystemEntries(tempFolder), cut: false);
-                    pane.ShowStatus($"{selection.Count} öğe arşivden kopyalandı");
+                    pane.ShowStatus(Loc.F("{0} öğe arşivden kopyalandı", selection.Count));
                     break;
                 case PaneCommand.Cut when selection.Count > 0:
                 case PaneCommand.Copy when selection.Count > 0:
                     await ClipboardService.SetFilesAsync(selection.Select(i => i.FullPath), cut: command == PaneCommand.Cut);
-                    pane.ShowStatus(command == PaneCommand.Cut ? $"{selection.Count} öğe kesildi" : $"{selection.Count} öğe kopyalandı");
+                    pane.ShowStatus(command == PaneCommand.Cut ? Loc.F("{0} öğe kesildi", selection.Count) : Loc.F("{0} öğe kopyalandı", selection.Count));
                     break;
                 case PaneCommand.Paste:
                     await PasteAsync(pane);
@@ -437,7 +438,7 @@ public sealed partial class MainWindow : Window, IPaneHost
                     if (text.Length > 0)
                     {
                         ClipboardService.SetText(text);
-                        pane.ShowStatus("Yol panoya kopyalandı");
+                        pane.ShowStatus(Loc.T("Yol panoya kopyalandı"));
                     }
                     break;
                 case PaneCommand.CopyToOther:
@@ -448,7 +449,7 @@ public sealed partial class MainWindow : Window, IPaneHost
                     break;
                 case PaneCommand.Properties when target is { IsInArchive: true }:
                     await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, target.Name,
-                        $"ZIP içinde · {(target.IsDirectory ? "Klasör" : target.SizeText)}\nDeğiştirilme: {target.ModifiedText}\nArşiv: {target.ArchivePath}");
+                        Loc.F("ZIP içinde · {0}\nDeğiştirilme: {1}\nArşiv: {2}", (target.IsDirectory ? Loc.T("Klasör") : target.SizeText), target.ModifiedText, target.ArchivePath));
                     break;
                 case PaneCommand.Properties:
                     var subject = target ?? (pane.IsDriveList ? null : new FileItem
@@ -490,8 +491,8 @@ public sealed partial class MainWindow : Window, IPaneHost
                 {
                     if (!VsCode.IsInstalled)
                     {
-                        await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "VS Code bulunamadı",
-                            "Visual Studio Code bu bilgisayarda kurulu görünmüyor. code.visualstudio.com adresinden kurabilirsiniz.");
+                        await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("VS Code bulunamadı"),
+                            Loc.T("Visual Studio Code bu bilgisayarda kurulu görünmüyor. code.visualstudio.com adresinden kurabilirsiniz."));
                         break;
                     }
                     string? codePath = target is null ? (pane.IsFileSystemFolder ? pane.CurrentPath : null) : await RealPathAsync(target);
@@ -511,7 +512,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         }
         catch (Exception ex)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "İşlem tamamlanamadı", ex.Message);
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("İşlem tamamlanamadı"), ex.Message);
         }
     }
 
@@ -564,7 +565,7 @@ public sealed partial class MainWindow : Window, IPaneHost
             case "app:deselectpattern": await _active.SelectByPatternAsync(select: false); break;
             case "app:log":
                 Directory.CreateDirectory(CrashLog.FolderPath);
-                if (!File.Exists(CrashLog.FilePath)) File.WriteAllText(CrashLog.FilePath, "Henüz kayıtlı hata yok.\r\n");
+                if (!File.Exists(CrashLog.FilePath)) File.WriteAllText(CrashLog.FilePath, Loc.T("Henüz kayıtlı hata yok.\r\n"));
                 ShellActions.Open(CrashLog.FilePath);
                 break;
             default:
@@ -588,12 +589,12 @@ public sealed partial class MainWindow : Window, IPaneHost
         var target = source == LeftPane ? RightPane : LeftPane;
         if (target.IsDriveList)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Hedef seçilmedi", "Karşı panelde bir klasör açın.");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Hedef seçilmedi"), Loc.T("Karşı panelde bir klasör açın."));
             return;
         }
         if (string.Equals(source.CurrentPath, target.CurrentPath, StringComparison.OrdinalIgnoreCase))
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Aynı klasör", "İki panel aynı klasörü gösteriyor.");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Aynı klasör"), Loc.T("İki panel aynı klasörü gösteriyor."));
             return;
         }
 
@@ -608,14 +609,14 @@ public sealed partial class MainWindow : Window, IPaneHost
         {
             if (target.IsInArchive)
             {
-                await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Desteklenmiyor", "Bir arşivden diğerine doğrudan kopyalanamıyor; önce bir klasöre çıkarın.");
+                await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Desteklenmiyor"), Loc.T("Bir arşivden diğerine doğrudan kopyalanamıyor; önce bir klasöre çıkarın."));
                 return;
             }
             var mode = await AskOverwriteAsync(ArchiveService.CountConflicts(items, target.CurrentPath));
             if (mode is null) return;
-            source.ShowStatus("Çıkarılıyor…");
+            source.ShowStatus(Loc.T("Çıkarılıyor…"));
             int extracted = await ArchiveService.ExtractAsync(items, target.CurrentPath, mode.Value);
-            source.ShowStatus($"{extracted} dosya çıkarıldı");
+            source.ShowStatus(Loc.F("{0} dosya çıkarıldı", extracted));
             target.Refresh();
             return;
         }
@@ -625,7 +626,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         // Arşivin içine: ekle (taşımada kaynaklar sonra Geri Dönüşüm Kutusu'na)
         if (target.IsInArchive)
         {
-            target.ShowStatus("Arşive ekleniyor…");
+            target.ShowStatus(Loc.T("Arşive ekleniyor…"));
             await ArchiveService.AddAsync(target.ArchiveFile!, target.ArchiveInner, sources);
             if (move) await ShellFileOperations.RecycleAsync(Hwnd, sources);
             source.Refresh();
@@ -645,10 +646,10 @@ public sealed partial class MainWindow : Window, IPaneHost
     private async Task<OverwriteMode?> AskOverwriteAsync(int conflicts)
     {
         if (conflicts == 0) return OverwriteMode.Overwrite;
-        var dialog = Dialogs.Create(Content.XamlRoot, DialogTheme, "Bazı öğeler zaten var",
-            new TextBlock { Text = $"Hedefte aynı adlı {conflicts} öğe var. Ne yapılsın?", TextWrapping = TextWrapping.Wrap },
-            "Üzerine yaz", "Vazgeç", ContentDialogButton.Secondary);
-        dialog.SecondaryButtonText = "Var olanları atla";
+        var dialog = Dialogs.Create(Content.XamlRoot, DialogTheme, Loc.T("Bazı öğeler zaten var"),
+            new TextBlock { Text = Loc.F("Hedefte aynı adlı {0} öğe var. Ne yapılsın?", conflicts), TextWrapping = TextWrapping.Wrap },
+            Loc.T("Üzerine yaz"), Loc.T("Vazgeç"), ContentDialogButton.Secondary);
+        dialog.SecondaryButtonText = Loc.T("Var olanları atla");
         return await dialog.ShowAsync() switch
         {
             ContentDialogResult.Primary => OverwriteMode.Overwrite,
@@ -661,19 +662,19 @@ public sealed partial class MainWindow : Window, IPaneHost
     {
         if (items.Count == 0 || !pane.IsFileSystemFolder) return;
         var baseName = items.Count == 1 ? Path.GetFileNameWithoutExtension(items[0].Name) : Path.GetFileName(pane.CurrentPath.TrimEnd('\\'));
-        if (string.IsNullOrWhiteSpace(baseName)) baseName = "Arşiv";
+        if (string.IsNullOrWhiteSpace(baseName)) baseName = Loc.T("Arşiv");
         var suggested = Path.GetFileName(ShellNew.UniquePath(Path.Combine(pane.CurrentPath, baseName + ".zip")));
-        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "ZIP olarak sıkıştır", suggested, "Sıkıştır", selectStem: true);
+        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, Loc.T("ZIP olarak sıkıştır"), suggested, Loc.T("Sıkıştır"), selectStem: true);
         if (name is null) return;
         if (!name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) name += ".zip";
         var archive = Path.Combine(pane.CurrentPath, name);
         if (File.Exists(archive))
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Dosya zaten var", $"{name} adında bir dosya var; başka bir ad seçin.");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Dosya zaten var"), Loc.F("{0} adında bir dosya var; başka bir ad seçin.", name));
             return;
         }
 
-        pane.ShowStatus($"{name} oluşturuluyor…");
+        pane.ShowStatus(Loc.F("{0} oluşturuluyor…", name));
         try
         {
             await ArchiveService.CreateAsync(archive, items.Select(i => i.FullPath));
@@ -691,15 +692,15 @@ public sealed partial class MainWindow : Window, IPaneHost
     {
         if (!destination.IsFileSystemFolder)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Hedef seçilmedi", "Çıkarmak için hedef panelde bir klasör açın.");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Hedef seçilmedi"), Loc.T("Çıkarmak için hedef panelde bir klasör açın."));
             return;
         }
         var folderName = Path.GetFileName(ShellNew.UniquePath(Path.Combine(destination.CurrentPath, Path.GetFileNameWithoutExtension(archive.Name))));
         var target = Path.Combine(destination.CurrentPath, folderName);
         Directory.CreateDirectory(target);
-        source.ShowStatus($"{archive.Name} çıkarılıyor…");
+        source.ShowStatus(Loc.F("{0} çıkarılıyor…", archive.Name));
         int count = await ArchiveService.ExtractAllAsync(archive.FullPath, target, OverwriteMode.Overwrite);
-        source.ShowStatus($"{count} dosya çıkarıldı → {folderName}");
+        source.ShowStatus(Loc.F("{0} dosya çıkarıldı → {1}", count, folderName));
         destination.Refresh();
         destination.SelectByName(folderName);
     }
@@ -718,7 +719,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (target.IsInArchive)
         {
             SetActive(target);
-            target.ShowStatus("Arşive ekleniyor…");
+            target.ShowStatus(Loc.T("Arşive ekleniyor…"));
             await ArchiveService.AddAsync(target.ArchiveFile!, target.ArchiveInner, paths);
             target.Refresh();
             return;
@@ -753,7 +754,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
         if (pane.IsInArchive)
         {
-            pane.ShowStatus("Arşive ekleniyor…");
+            pane.ShowStatus(Loc.T("Arşive ekleniyor…"));
             await ArchiveService.AddAsync(pane.ArchiveFile!, pane.ArchiveInner, files.Paths);
             pane.Refresh();
             return;
@@ -770,11 +771,11 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private async Task RenameAsync(FilePane pane, FileItem item)
     {
-        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "Yeniden adlandır", item.Name, "Adlandır", selectStem: !item.IsDirectory);
+        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, Loc.T("Yeniden adlandır"), item.Name, Loc.T("Adlandır"), selectStem: !item.IsDirectory);
         if (name is null || name == item.Name) return;
         if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Geçersiz ad", "Ad şu karakterleri içeremez: \\ / : * ? \" < > |");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Geçersiz ad"), Loc.T("Ad şu karakterleri içeremez: \\ / : * ? \" < > |"));
             return;
         }
 
@@ -792,8 +793,8 @@ public sealed partial class MainWindow : Window, IPaneHost
     private async Task NewFolderAsync(FilePane pane)
     {
         if (!pane.IsFileSystemFolder) return;
-        var suggested = Path.GetFileName(ShellNew.UniquePath(Path.Combine(pane.CurrentPath, "Yeni klasör")));
-        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "Yeni klasör", suggested, "Oluştur");
+        var suggested = Path.GetFileName(ShellNew.UniquePath(Path.Combine(pane.CurrentPath, Loc.T("Yeni klasör"))));
+        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, Loc.T("Yeni klasör"), suggested, Loc.T("Oluştur"));
         if (name is null) return;
         Directory.CreateDirectory(Path.Combine(pane.CurrentPath, name));
         pane.Refresh();
@@ -803,12 +804,12 @@ public sealed partial class MainWindow : Window, IPaneHost
     private async Task DeleteAsync(FilePane pane, IReadOnlyList<FileItem> items, bool permanent)
     {
         if (items.Count == 0) return;
-        var subject = items.Count == 1 ? $"\"{items[0].Name}\"" : $"{items.Count} öğe";
+        var subject = items.Count == 1 ? $"\"{items[0].Name}\"" : Loc.F("{0} öğe", items.Count);
 
         if (pane.IsInArchive)
         {
-            if (!await Dialogs.ConfirmDangerAsync(Content.XamlRoot, DialogTheme, $"{subject} arşivden silinsin mi?",
-                    "Arşivin içinden silinen öğeler Geri Dönüşüm Kutusu'na gitmez ve geri alınamaz.", "Arşivden sil")) return;
+            if (!await Dialogs.ConfirmDangerAsync(Content.XamlRoot, DialogTheme, Loc.F("{0} arşivden silinsin mi?", subject),
+                    Loc.T("Arşivin içinden silinen öğeler Geri Dönüşüm Kutusu'na gitmez ve geri alınamaz."), Loc.T("Arşivden sil"))) return;
             await ArchiveService.DeleteAsync(items);
             pane.Refresh();
             return;
@@ -817,16 +818,16 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (permanent)
         {
             if (!await Dialogs.ConfirmDangerAsync(Content.XamlRoot, DialogTheme,
-                    $"{subject} kalıcı olarak silinsin mi?",
-                    "Bu öğeler Geri Dönüşüm Kutusu'na gitmeyecek ve geri alınamayacak.",
-                    "Kalıcı olarak sil")) return;
+                    Loc.F("{0} kalıcı olarak silinsin mi?", subject),
+                    Loc.T("Bu öğeler Geri Dönüşüm Kutusu'na gitmeyecek ve geri alınamayacak."),
+                    Loc.T("Kalıcı olarak sil"))) return;
             Preview.Stop();
             await ShellFileOperations.DeletePermanentlyAsync(Hwnd, items.Select(i => i.FullPath));
         }
         else
         {
-            if (!await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, $"{subject} silinsin mi?",
-                    "Geri Dönüşüm Kutusu'na gönderilecek. Kalıcı silmek için Shift basılıyken sil.", "Sil")) return;
+            if (!await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, Loc.F("{0} silinsin mi?", subject),
+                    Loc.T("Geri Dönüşüm Kutusu'na gönderilecek. Kalıcı silmek için Shift basılıyken sil."), Loc.T("Sil"))) return;
             Preview.Stop();
             await ShellFileOperations.RecycleAsync(Hwnd, items.Select(i => i.FullPath));
         }
@@ -870,7 +871,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
         bool media = single && kind is FileKind.Audio or FileKind.Video;
         Show(RbPlay, media);
-        RbPlay.Label = kind == FileKind.Video ? "Oynat" : "Çal";
+        RbPlay.Label = kind == FileKind.Video ? Loc.T("Oynat") : Loc.T("Çal");
         Show(RbPreview, single && kind is FileKind.Image or FileKind.Pdf or FileKind.Text);
         Show(RbEdit, single && kind == FileKind.Text);
         Show(RbOpenWith, single && !item!.IsDirectory);
@@ -889,7 +890,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         {
             ContextTag.Visibility = Visibility.Visible;
             ContextTagIcon.Glyph = "";
-            ContextTagText.Text = $"{selection.Count} öğe";
+            ContextTagText.Text = Loc.F("{0} öğe", selection.Count);
         }
         else
         {
@@ -923,12 +924,12 @@ public sealed partial class MainWindow : Window, IPaneHost
         }
 
         var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        AddRoot("Masaüstü", Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
-        AddRoot("Belgeler", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
-        AddRoot("İndirilenler", Path.Combine(profile, "Downloads"));
-        AddRoot("Resimler", Environment.GetFolderPath(Environment.SpecialFolder.MyPictures));
-        AddRoot("Müzik", Environment.GetFolderPath(Environment.SpecialFolder.MyMusic));
-        AddRoot("Videolar", Environment.GetFolderPath(Environment.SpecialFolder.MyVideos));
+        AddRoot(Loc.T("Masaüstü"), Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
+        AddRoot(Loc.T("Belgeler"), Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+        AddRoot(Loc.T("İndirilenler"), Path.Combine(profile, "Downloads"));
+        AddRoot(Loc.T("Resimler"), Environment.GetFolderPath(Environment.SpecialFolder.MyPictures));
+        AddRoot(Loc.T("Müzik"), Environment.GetFolderPath(Environment.SpecialFolder.MyMusic));
+        AddRoot(Loc.T("Videolar"), Environment.GetFolderPath(Environment.SpecialFolder.MyVideos));
         foreach (var drive in DriveInfo.GetDrives().Where(d => d.IsReady))
         {
             AddRoot(drive.Name.TrimEnd('\\'), drive.RootDirectory.FullName);
@@ -1051,7 +1052,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private async Task ShowSettingsAsync()
     {
-        var dialog = Dialogs.Create(Content.XamlRoot, DialogTheme, "Ayarlar", new SettingsView(Hwnd), close: "Kapat");
+        var dialog = Dialogs.Create(Content.XamlRoot, DialogTheme, Loc.T("Ayarlar"), new SettingsView(Hwnd), close: Loc.T("Kapat"));
         await dialog.ShowAsync();
     }
 
@@ -1069,11 +1070,11 @@ public sealed partial class MainWindow : Window, IPaneHost
 
         var url = text!;
         Notifier.Show(
-            "İndirme bağlantısı bulundu",
+            Loc.T("İndirme bağlantısı bulundu"),
             DownloadManager.GuessFileName(url),
             "",
-            new NotificationAction("İndir", () => StartDownload(url), IsPrimary: true),
-            new NotificationAction("Yoksay", () => { }));
+            new NotificationAction(Loc.T("İndir"), () => StartDownload(url), IsPrimary: true),
+            new NotificationAction(Loc.T("Yoksay"), () => { }));
     }
 
     // ================================================================ İndirmeler
@@ -1103,8 +1104,8 @@ public sealed partial class MainWindow : Window, IPaneHost
     private async Task EnableDownloadsPromptAsync()
     {
         if (!AppWindow.IsVisible) ShowFromTray();
-        bool enable = await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, "İndirme yöneticisi kapalı",
-            "İndirme yöneticisi varsayılan olarak kapalı gelir. Şimdi açılsın mı? Ayarlar'dan istediğin zaman kapatabilirsin.", "Aç");
+        bool enable = await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, Loc.T("İndirme yöneticisi kapalı"),
+            Loc.T("İndirme yöneticisi varsayılan olarak kapalı gelir. Şimdi açılsın mı? Ayarlar'dan istediğin zaman kapatabilirsin."), Loc.T("Aç"));
         if (!enable) return;
         _settings.DownloadsEnabled = true;
         ShowDownloads();
@@ -1122,14 +1123,14 @@ public sealed partial class MainWindow : Window, IPaneHost
         DownloadIndicator.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         if (show)
         {
-            DownloadIndicatorText.Text = active == 1 ? "1 indirme" : $"{active} indirme";
+            DownloadIndicatorText.Text = active == 1 ? Loc.T("1 indirme") : Loc.F("{0} indirme", active);
             bool unknown = progress is double p && double.IsNaN(p);
             DownloadIndicatorBar.IsIndeterminate = unknown;
             DownloadIndicatorBar.Value = unknown || progress is null ? 0 : progress.Value * 100;
         }
 
         _tray?.SetTooltip(active > 0 && progress is double t && !double.IsNaN(t)
-            ? $"Zero File Commander · {active} indirme · %{t * 100:0}"
+            ? Loc.F("Zero File Commander · {0} indirme · %{1:0}", active, t * 100)
             : "Zero File Commander");
     }
 
@@ -1137,11 +1138,11 @@ public sealed partial class MainWindow : Window, IPaneHost
     {
         UpdateDownloadIndicators();
         Notifier.Show(
-            "İndirme tamamlandı",
+            Loc.T("İndirme tamamlandı"),
             $"{item.FileName} · {DownloadManager.FormatSize(item.ReceivedBytes)}",
             "",
-            new NotificationAction("Aç", () => ShellActions.Open(item.FilePath), IsPrimary: true),
-            new NotificationAction("Klasörde göster", () => ShellActions.ShowInExplorer(item.FilePath)));
+            new NotificationAction(Loc.T("Aç"), () => ShellActions.Open(item.FilePath), IsPrimary: true),
+            new NotificationAction(Loc.T("Klasörde göster"), () => ShellActions.ShowInExplorer(item.FilePath)));
     }
 
     // ================================================================ Sürücü çubuğu
@@ -1208,7 +1209,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         else if (used >= 75) bar.ShowPaused = true;
         var free = new TextBlock
         {
-            Text = $"{Models.FileItem.FormatSize(drive.Free)} boş / {Models.FileItem.FormatSize(drive.Total)}",
+            Text = Loc.F("{0} boş / {1}", Models.FileItem.FormatSize(drive.Free), Models.FileItem.FormatSize(drive.Total)),
             Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
             Opacity = 0.75,
         };
@@ -1229,7 +1230,7 @@ public sealed partial class MainWindow : Window, IPaneHost
             Tag = drive.Root,
             BorderThickness = new Thickness(1),
         };
-        ToolTipService.SetToolTip(button, $"{drive.Letter} sürücüsünü aktif panelde aç · %{used:0} dolu");
+        ToolTipService.SetToolTip(button, Loc.F("{0} sürücüsünü aktif panelde aç · %{1:0} dolu", drive.Letter, used));
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, $"{drive.Letter} {drive.Label}");
         button.Click += (_, _) =>
         {
@@ -1264,66 +1265,66 @@ public sealed partial class MainWindow : Window, IPaneHost
 
     private static string DriveTypeName(DriveType type) => type switch
     {
-        DriveType.Removable => "Çıkarılabilir disk",
-        DriveType.Network => "Ağ sürücüsü",
+        DriveType.Removable => Loc.T("Çıkarılabilir disk"),
+        DriveType.Network => Loc.T("Ağ sürücüsü"),
         DriveType.CDRom => "CD/DVD",
         DriveType.Ram => "RAM disk",
-        _ => "Yerel disk",
+        _ => Loc.T("Yerel disk"),
     };
 
     // ================================================================ Faz 2: güç araçları
 
     private static readonly (string Tag, string Label, string Glyph, string Shortcut)[] PaletteCommands =
     [
-        ("NewFolder", "Yeni klasör", "\uE8F4", "F7"),
-        ("Copy", "Kopyala", "\uE8C8", "Ctrl+C"),
-        ("Cut", "Kes", "\uE8C6", "Ctrl+X"),
-        ("Paste", "Yapıştır", "\uE77F", "Ctrl+V"),
-        ("Rename", "Yeniden adlandır", "\uE8AC", "F2"),
-        ("Delete", "Sil (Geri Dönüşüm Kutusu)", "\uE74D", "Del"),
-        ("CopyToOther", "Karşı panele kopyala", "\uE8C8", "F5"),
-        ("MoveToOther", "Karşı panele taşı", "\uE8DE", "F6"),
-        ("CopyPath", "Yolu kopyala", "\uE71B", "Ctrl+Shift+C"),
-        ("Properties", "Özellikler", "\uE946", "Alt+Enter"),
-        ("OpenTerminal", "Terminalde aç", "\uE756", ""),
-        ("ShowInExplorer", "Dosya Gezgini'nde göster", "\uE838", ""),
-        ("Compress", "ZIP olarak sıkıştır", "\uF012", ""),
-        ("ExtractToOther", "Arşivi karşı panele çıkar", "\uE8B7", ""),
-        ("Refresh", "Yenile", "\uE72C", "Ctrl+R"),
-        ("app:batchrename", "Toplu yeniden adlandır", "\uE8AC", "Ctrl+M"),
-        ("app:search", "Ara", "\uE721", "Alt+F7"),
-        ("app:comparemark", "Klasörleri karşılaştır (farkları işaretle)", "\uE8FD", ""),
-        ("app:sync", "Klasör senkronizasyonu", "\uE895", ""),
-        ("app:newtab", "Yeni sekme", "\uEC6C", "Ctrl+T"),
-        ("app:closetab", "Sekmeyi kapat", "\uE711", "Ctrl+W"),
-        ("app:editpath", "Yolu düzenle", "\uE70F", "Ctrl+L"),
-        ("app:swap", "Panelleri değiştir", "\uE8AB", ""),
-        ("app:samefolder", "Panelleri eşitle", "\uE895", ""),
-        ("app:selectall", "Tümünü seç", "\uE8B3", "Ctrl+A"),
-        ("app:selectpattern", "Desenle seç", "\uE71C", "Num +"),
-        ("app:invert", "Seçimi tersine çevir", "\uE8B3", "Num *"),
-        ("app:preview", "Önizleme panelini aç/kapat", "\uE8FF", "Ctrl+Q"),
-        ("app:tree", "Klasör ağacını aç/kapat", "\uE8A4", "Ctrl+Shift+E"),
-        ("app:drives", "Sürücü çubuğunu aç/kapat", "\uEDA2", ""),
-        ("app:ribbon", "Şeridi aç/kapat", "\uE8A0", ""),
-        ("app:theme:0", "Tema: sisteme göre", "\uE790", ""),
-        ("app:theme:1", "Tema: aydınlık", "\uE706", ""),
-        ("app:theme:2", "Tema: karanlık", "\uE708", ""),
-        ("app:downloads", "İndirmeler", "\uE896", "Ctrl+J"),
-        ("app:transfers", "Aktarımlar (kopyalama kuyruğu)", "\uE8C8", ""),
-        ("app:newwindow", "Yeni pencere", "\uE78B", "Ctrl+N"),
-        ("app:sendtowindow", "Diğer pencereye kopyala", "\uE8A7", "Ctrl+Shift+→"),
-        ("app:shelf", "Rafı aç/kapat", "\uE7B8", "Ctrl+Shift+S"),
-        ("app:newconnection", "Yeni bağlantı (NAS, SFTP, FTP)", "\uE968", ""),
-        ("OpenInVsCode", "VS Code ile aç", "\uE943", ""),
-        ("app:connections", "Bağlantıları yönet", "\uE713", ""),
-        ("AddToShelf", "Rafa ekle", "\uE7B8", ""),
-        ("app:settings", "Ayarlar", "\uE713", "Ctrl+,"),
-        ("app:resetlayout", "Panel yerleşimini sıfırla", "\uE7A7", ""),
-        ("app:shortcuts", "Klavye kısayolları", "\uE765", "F1"),
-        ("app:about", "Hakkında", "\uE946", ""),
-        ("app:hide", "Tepsiye gizle", "\uE921", ""),
-        ("app:exit", "Çıkış", "\uE7E8", ""),
+        ("NewFolder", Loc.T("Yeni klasör"), "\uE8F4", "F7"),
+        ("Copy", Loc.T("Kopyala"), "\uE8C8", "Ctrl+C"),
+        ("Cut", Loc.T("Kes"), "\uE8C6", "Ctrl+X"),
+        ("Paste", Loc.T("Yapıştır"), "\uE77F", "Ctrl+V"),
+        ("Rename", Loc.T("Yeniden adlandır"), "\uE8AC", "F2"),
+        ("Delete", Loc.T("Sil (Geri Dönüşüm Kutusu)"), "\uE74D", "Del"),
+        ("CopyToOther", Loc.T("Karşı panele kopyala"), "\uE8C8", "F5"),
+        ("MoveToOther", Loc.T("Karşı panele taşı"), "\uE8DE", "F6"),
+        ("CopyPath", Loc.T("Yolu kopyala"), "\uE71B", "Ctrl+Shift+C"),
+        ("Properties", Loc.T("Özellikler"), "\uE946", "Alt+Enter"),
+        ("OpenTerminal", Loc.T("Terminalde aç"), "\uE756", ""),
+        ("ShowInExplorer", Loc.T("Dosya Gezgini'nde göster"), "\uE838", ""),
+        ("Compress", Loc.T("ZIP olarak sıkıştır"), "\uF012", ""),
+        ("ExtractToOther", Loc.T("Arşivi karşı panele çıkar"), "\uE8B7", ""),
+        ("Refresh", Loc.T("Yenile"), "\uE72C", "Ctrl+R"),
+        ("app:batchrename", Loc.T("Toplu yeniden adlandır"), "\uE8AC", "Ctrl+M"),
+        ("app:search", Loc.T("Ara"), "\uE721", "Alt+F7"),
+        ("app:comparemark", Loc.T("Klasörleri karşılaştır (farkları işaretle)"), "\uE8FD", ""),
+        ("app:sync", Loc.T("Klasör senkronizasyonu"), "\uE895", ""),
+        ("app:newtab", Loc.T("Yeni sekme"), "\uEC6C", "Ctrl+T"),
+        ("app:closetab", Loc.T("Sekmeyi kapat"), "\uE711", "Ctrl+W"),
+        ("app:editpath", Loc.T("Yolu düzenle"), "\uE70F", "Ctrl+L"),
+        ("app:swap", Loc.T("Panelleri değiştir"), "\uE8AB", ""),
+        ("app:samefolder", Loc.T("Panelleri eşitle"), "\uE895", ""),
+        ("app:selectall", Loc.T("Tümünü seç"), "\uE8B3", "Ctrl+A"),
+        ("app:selectpattern", Loc.T("Desenle seç"), "\uE71C", "Num +"),
+        ("app:invert", Loc.T("Seçimi tersine çevir"), "\uE8B3", "Num *"),
+        ("app:preview", Loc.T("Önizleme panelini aç/kapat"), "\uE8FF", "Ctrl+Q"),
+        ("app:tree", Loc.T("Klasör ağacını aç/kapat"), "\uE8A4", "Ctrl+Shift+E"),
+        ("app:drives", Loc.T("Sürücü çubuğunu aç/kapat"), "\uEDA2", ""),
+        ("app:ribbon", Loc.T("Şeridi aç/kapat"), "\uE8A0", ""),
+        ("app:theme:0", Loc.T("Tema: sisteme göre"), "\uE790", ""),
+        ("app:theme:1", Loc.T("Tema: aydınlık"), "\uE706", ""),
+        ("app:theme:2", Loc.T("Tema: karanlık"), "\uE708", ""),
+        ("app:downloads", Loc.T("İndirmeler"), "\uE896", "Ctrl+J"),
+        ("app:transfers", Loc.T("Aktarımlar (kopyalama kuyruğu)"), "\uE8C8", ""),
+        ("app:newwindow", Loc.T("Yeni pencere"), "\uE78B", "Ctrl+N"),
+        ("app:sendtowindow", Loc.T("Diğer pencereye kopyala"), "\uE8A7", "Ctrl+Shift+→"),
+        ("app:shelf", Loc.T("Rafı aç/kapat"), "\uE7B8", "Ctrl+Shift+S"),
+        ("app:newconnection", Loc.T("Yeni bağlantı (NAS, SFTP, FTP)"), "\uE968", ""),
+        ("OpenInVsCode", Loc.T("VS Code ile aç"), "\uE943", ""),
+        ("app:connections", Loc.T("Bağlantıları yönet"), "\uE713", ""),
+        ("AddToShelf", Loc.T("Rafa ekle"), "\uE7B8", ""),
+        ("app:settings", Loc.T("Ayarlar"), "\uE713", "Ctrl+,"),
+        ("app:resetlayout", Loc.T("Panel yerleşimini sıfırla"), "\uE7A7", ""),
+        ("app:shortcuts", Loc.T("Klavye kısayolları"), "\uE765", "F1"),
+        ("app:about", Loc.T("Hakkında"), "\uE946", ""),
+        ("app:hide", Loc.T("Tepsiye gizle"), "\uE921", ""),
+        ("app:exit", Loc.T("Çıkış"), "\uE7E8", ""),
     ];
 
     private void OpenPalette()
@@ -1335,7 +1336,7 @@ public sealed partial class MainWindow : Window, IPaneHost
             foreach (var (tag, label, glyph, shortcut) in PaletteCommands)
             {
                 var captured = tag;
-                items.Add(new PaletteItem { Title = label, Subtitle = "Komut", Glyph = glyph, Shortcut = shortcut, Group = PaletteGroup.Command, Run = () => RunTag(captured) });
+                items.Add(new PaletteItem { Title = label, Subtitle = Loc.T("Komut"), Glyph = glyph, Shortcut = shortcut, Group = PaletteGroup.Command, Run = () => RunTag(captured) });
             }
             foreach (var folder in _history)
             {
@@ -1353,7 +1354,7 @@ public sealed partial class MainWindow : Window, IPaneHost
             foreach (var (root, _) in _driveButtons)
             {
                 var path = root;
-                items.Add(new PaletteItem { Title = path.TrimEnd('\\'), Subtitle = "Sürücü", Glyph = "\uEDA2", Group = PaletteGroup.Folder, Run = () => { pane.Navigate(path); pane.FocusList(); } });
+                items.Add(new PaletteItem { Title = path.TrimEnd('\\'), Subtitle = Loc.T("Sürücü"), Glyph = "\uEDA2", Group = PaletteGroup.Folder, Run = () => { pane.Navigate(path); pane.FocusList(); } });
             }
             foreach (var entry in pane.Entries)
             {
@@ -1361,7 +1362,7 @@ public sealed partial class MainWindow : Window, IPaneHost
                 items.Add(new PaletteItem
                 {
                     Title = name,
-                    Subtitle = entry.IsDirectory ? "Bu klasörde · klasör" : $"Bu klasörde · {entry.SizeText}",
+                    Subtitle = entry.IsDirectory ? Loc.T("Bu klasörde · klasör") : Loc.F("Bu klasörde · {0}", entry.SizeText),
                     Glyph = entry.Glyph,
                     Group = PaletteGroup.File,
                     Run = () => { pane.SelectByName(name); pane.FocusList(); },
@@ -1379,8 +1380,8 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (items.Count == 0) return;
 
         var view = new BatchRenameView(items);
-        var dialog = Dialogs.Create(Content.XamlRoot, DialogTheme, $"Toplu yeniden adlandır · {items.Count} öğe", view,
-            "Yeniden adlandır", "Vazgeç", ContentDialogButton.Primary);
+        var dialog = Dialogs.Create(Content.XamlRoot, DialogTheme, Loc.F("Toplu yeniden adlandır · {0} öğe", items.Count), view,
+            Loc.T("Yeniden adlandır"), Loc.T("Vazgeç"), ContentDialogButton.Primary);
         dialog.Resources["ContentDialogMaxWidth"] = 1000.0;
         dialog.IsPrimaryButtonEnabled = view.CanApply;
         view.Changed += (_, _) => dialog.IsPrimaryButtonEnabled = view.CanApply;
@@ -1391,7 +1392,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         {
             _lastRename = BatchRename.Apply(view.Rows);
             MenuUndoRename.IsEnabled = _lastRename.Count > 0;
-            pane.ShowStatus($"{_lastRename.Count} öğe yeniden adlandırıldı · Düzen → Geri al");
+            pane.ShowStatus(Loc.F("{0} öğe yeniden adlandırıldı · Düzen → Geri al", _lastRename.Count));
         }
         finally
         {
@@ -1403,8 +1404,8 @@ public sealed partial class MainWindow : Window, IPaneHost
     private async Task UndoRenameAsync()
     {
         if (_lastRename is null || _lastRename.Count == 0) return;
-        if (!await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, "Toplu adlandırma geri alınsın mı?",
-                $"{_lastRename.Count} öğe eski adına döndürülecek.", "Geri al")) return;
+        if (!await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, Loc.T("Toplu adlandırma geri alınsın mı?"),
+                Loc.F("{0} öğe eski adına döndürülecek.", _lastRename.Count), Loc.T("Geri al"))) return;
         Preview.Stop();
         BatchRename.Undo(_lastRename);
         _lastRename = null;
@@ -1418,7 +1419,7 @@ public sealed partial class MainWindow : Window, IPaneHost
     {
         if (!LeftPane.IsFileSystemFolder || !RightPane.IsFileSystemFolder)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Karşılaştırılamıyor", "İki panelde de bir klasör açık olmalı.");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Karşılaştırılamıyor"), Loc.T("İki panelde de bir klasör açık olmalı."));
             return;
         }
         var left = new Dictionary<string, FileItem>(StringComparer.OrdinalIgnoreCase);
@@ -1432,16 +1433,16 @@ public sealed partial class MainWindow : Window, IPaneHost
 
         int l = LeftPane.SelectWhere(i => Newer(i, right.GetValueOrDefault(i.Name)));
         int r = RightPane.SelectWhere(i => Newer(i, left.GetValueOrDefault(i.Name)));
-        LeftPane.ShowStatus(l == 0 ? "Fark yok" : $"{l} öğe karşıda yok ya da daha yeni");
-        RightPane.ShowStatus(r == 0 ? "Fark yok" : $"{r} öğe karşıda yok ya da daha yeni");
-        if (l + r == 0) Notifier.Show("Klasörler aynı", "İki panelde de fark bulunamadı.", "\uE8FB");
+        LeftPane.ShowStatus(l == 0 ? Loc.T("Fark yok") : Loc.F("{0} öğe karşıda yok ya da daha yeni", l));
+        RightPane.ShowStatus(r == 0 ? Loc.T("Fark yok") : Loc.F("{0} öğe karşıda yok ya da daha yeni", r));
+        if (l + r == 0) Notifier.Show(Loc.T("Klasörler aynı"), Loc.T("İki panelde de fark bulunamadı."), "\uE8FB");
     }
 
     private async Task OpenSyncAsync()
     {
         if (!LeftPane.IsFileSystemFolder || !RightPane.IsFileSystemFolder)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Senkronize edilemiyor", "İki panelde de bir klasör açık olmalı.");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Senkronize edilemiyor"), Loc.T("İki panelde de bir klasör açık olmalı."));
             return;
         }
         var window = new SyncWindow(LeftPane.CurrentPath, RightPane.CurrentPath);
@@ -1488,7 +1489,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (active > 0)
         {
             bool waiting = manager.Jobs.Any(j => j.State == TransferState.WaitingForConflicts);
-            TransferIndicatorText.Text = waiting ? "Çakışma bekliyor" : active == 1 ? "1 aktarım" : $"{active} aktarım";
+            TransferIndicatorText.Text = waiting ? Loc.T("Çakışma bekliyor") : active == 1 ? Loc.T("1 aktarım") : Loc.F("{0} aktarım", active);
             bool unknown = progress is null || double.IsNaN(progress.Value);
             TransferIndicatorBar.IsIndeterminate = unknown;
             TransferIndicatorBar.ShowPaused = waiting || manager.Jobs.Any(j => j.State == TransferState.Paused);
@@ -1520,24 +1521,24 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (job.State == TransferState.Canceled) return;
         if (job.State == TransferState.CompletedWithErrors)
         {
-            Notifier.Show(job.Kind == TransferKind.Copy ? "Kopyalama hatalarla bitti" : "Taşıma hatalarla bitti",
-                $"{job.FilesDone} dosya tamam, {job.ErrorCount} hata", "\uE7BA",
-                new NotificationAction("Ayrıntılar", () => ShowTransfers(), IsPrimary: true));
+            Notifier.Show(job.Kind == TransferKind.Copy ? Loc.T("Kopyalama hatalarla bitti") : Loc.T("Taşıma hatalarla bitti"),
+                Loc.F("{0} dosya tamam, {1} hata", job.FilesDone, job.ErrorCount), "\uE7BA",
+                new NotificationAction(Loc.T("Ayrıntılar"), () => ShowTransfers(), IsPrimary: true));
             return;
         }
         if (!slow && focused) return; // kısa işler için bildirim gürültü olur
-        Notifier.Show(job.Kind == TransferKind.Copy ? "Kopyalama tamamlandı" : "Taşıma tamamlandı",
-            $"{job.FilesDone} dosya · {Models.FileItem.FormatSize(job.BytesDone)} → {Path.GetFileName(job.Target.TrimEnd('\\'))}", "\uE8FB",
-            new NotificationAction("Klasörü aç", () => { ShowFromTray(); _active.Navigate(job.Target); }, IsPrimary: true));
+        Notifier.Show(job.Kind == TransferKind.Copy ? Loc.T("Kopyalama tamamlandı") : Loc.T("Taşıma tamamlandı"),
+            Loc.F("{0} dosya · {1} → {2}", job.FilesDone, Models.FileItem.FormatSize(job.BytesDone), Path.GetFileName(job.Target.TrimEnd('\\'))), "\uE8FB",
+            new NotificationAction(Loc.T("Klasörü aç"), () => { ShowFromTray(); _active.Navigate(job.Target); }, IsPrimary: true));
     }
 
     private void Transfer_ConflictsWaiting(object? sender, TransferJob job)
     {
-        Notifier.Show("Bazı dosyalar hedefte zaten var",
-            $"{job.ConflictCount} dosya bekliyor; diğerleri kopyalandı.", "\uE7BA",
-            new NotificationAction("Daha yeniyse değiştir", () => TransferManager.Current.ResolveConflicts(job, ConflictPolicy.OverwriteIfNewer), IsPrimary: true),
-            new NotificationAction("Atla", () => TransferManager.Current.ResolveConflicts(job, ConflictPolicy.Skip)),
-            new NotificationAction("Seçenekler…", () => ShowTransfers()));
+        Notifier.Show(Loc.T("Bazı dosyalar hedefte zaten var"),
+            Loc.F("{0} dosya bekliyor; diğerleri kopyalandı.", job.ConflictCount), "\uE7BA",
+            new NotificationAction(Loc.T("Daha yeniyse değiştir"), () => TransferManager.Current.ResolveConflicts(job, ConflictPolicy.OverwriteIfNewer), IsPrimary: true),
+            new NotificationAction(Loc.T("Atla"), () => TransferManager.Current.ResolveConflicts(job, ConflictPolicy.Skip)),
+            new NotificationAction(Loc.T("Seçenekler…"), () => ShowTransfers()));
     }
 
     private bool _windowActive;
@@ -1582,19 +1583,19 @@ public sealed partial class MainWindow : Window, IPaneHost
         var others = All.Where(w => w != this && w.AppWindow.IsVisible).ToList();
         if (others.Count == 0)
         {
-            if (await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, "Başka pencere yok",
-                    "Diğer monitörde kullanmak için yeni bir pencere açılsın mı? (Ctrl+N)", "Yeni pencere"))
+            if (await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, Loc.T("Başka pencere yok"),
+                    Loc.T("Diğer monitörde kullanmak için yeni bir pencere açılsın mı? (Ctrl+N)"), Loc.T("Yeni pencere")))
                 OpenNewWindow();
             return;
         }
         var target = others[0]._active;
         if (!target.IsFileSystemFolder)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Hedef seçilmedi", "Diğer pencerenin aktif panelinde bir klasör açın.");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Hedef seçilmedi"), Loc.T("Diğer pencerenin aktif panelinde bir klasör açın."));
             return;
         }
         await QueueOrShellAsync(false, selection.Select(i => i.FullPath).ToList(), target.CurrentPath);
-        _active.ShowStatus($"{selection.Count} öğe diğer pencereye gönderildi → {target.CurrentPath}");
+        _active.ShowStatus(Loc.F("{0} öğe diğer pencereye gönderildi → {1}", selection.Count, target.CurrentPath));
     }
 
     // ================================================================ Uygulama kilidi (PIN)
@@ -1671,7 +1672,7 @@ public sealed partial class MainWindow : Window, IPaneHost
 
         if (AppLock.Cooldown is { } wait)
         {
-            PinError.Text = $"Çok fazla yanlış deneme. {Math.Ceiling(wait.TotalSeconds)} sn sonra tekrar deneyin.";
+            PinError.Text = Loc.F("Çok fazla yanlış deneme. {0} sn sonra tekrar deneyin.", Math.Ceiling(wait.TotalSeconds));
             PinBox.Password = string.Empty;
             return;
         }
@@ -1685,8 +1686,8 @@ public sealed partial class MainWindow : Window, IPaneHost
         }
         PinBox.Password = string.Empty;
         PinError.Text = AppLock.Cooldown is { } blocked
-            ? $"Çok fazla yanlış deneme. {Math.Ceiling(blocked.TotalSeconds)} sn bekleyin."
-            : "PIN yanlış.";
+            ? Loc.F("Çok fazla yanlış deneme. {0} sn bekleyin.", Math.Ceiling(blocked.TotalSeconds))
+            : Loc.T("PIN yanlış.");
     }
 
     private void PinBox_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -1712,12 +1713,12 @@ public sealed partial class MainWindow : Window, IPaneHost
     /// </summary>
     private void BuildConnectionsMenu()
     {
-        var menu = new MenuBarItem { Title = "Bağlantılar" };
+        var menu = new MenuBarItem { Title = Loc.T("Bağlantılar") };
 
-        var add = new MenuFlyoutItem { Text = "Yeni bağlantı…", Icon = new FontIcon { Glyph = "\uE710" } };
+        var add = new MenuFlyoutItem { Text = Loc.T("Yeni bağlantı…"), Icon = new FontIcon { Glyph = "\uE710" } };
         add.Click += async (_, _) => await NewConnectionAsync();
         menu.Items.Add(add);
-        var manage = new MenuFlyoutItem { Text = "Bağlantıları yönet…", Icon = new FontIcon { Glyph = "\uE713" } };
+        var manage = new MenuFlyoutItem { Text = Loc.T("Bağlantıları yönet…"), Icon = new FontIcon { Glyph = "\uE713" } };
         manage.Click += async (_, _) => await ManageConnectionsAsync();
         menu.Items.Add(manage);
 
@@ -1787,8 +1788,8 @@ public sealed partial class MainWindow : Window, IPaneHost
                     foreach (var pane in new[] { LeftPane, RightPane }.Where(p => p.IsRemote)) pane.Navigate(string.Empty);
                     return;
                 case ConnectionDialogs.ManageAction.Delete when connection is not null:
-                    if (await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, $"\"{connection.Name}\" silinsin mi?",
-                            "Bağlantı ve kayıtlı parolası silinir. Sunucudaki dosyalara dokunulmaz.", "Sil"))
+                    if (await Dialogs.ConfirmAsync(Content.XamlRoot, DialogTheme, Loc.F("\"{0}\" silinsin mi?", connection.Name),
+                            Loc.T("Bağlantı ve kayıtlı parolası silinir. Sunucudaki dosyalara dokunulmaz."), Loc.T("Sil")))
                     {
                         RemoteSessions.Close(connection.Id);
                         ConnectionStore.Remove(connection);
@@ -1829,7 +1830,7 @@ public sealed partial class MainWindow : Window, IPaneHost
                 if (connection.Kind == ConnectionKind.Sftp && string.IsNullOrEmpty(connection.KeyFile) &&
                     ConnectionStore.GetPassword(connection) is null)
                 {
-                    var asked = await ConnectionDialogs.PasswordAsync(Content.XamlRoot, DialogTheme, connection, $"{connection.Host} için parola girin.");
+                    var asked = await ConnectionDialogs.PasswordAsync(Content.XamlRoot, DialogTheme, connection, Loc.F("{0} için parola girin.", connection.Host));
                     if (asked is null) return null;
                     ConnectionStore.SetPassword(connection, asked.Value.Password, asked.Value.Save);
                 }
@@ -1849,8 +1850,8 @@ public sealed partial class MainWindow : Window, IPaneHost
             }
             catch (Exception ex)
             {
-                CrashLog.Write("Uzak bağlantı", ex);
-                await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, $"{connection.Name} bağlantısı kurulamadı", ex.Message);
+                CrashLog.Write(Loc.T("Uzak bağlantı"), ex);
+                await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.F("{0} bağlantısı kurulamadı", connection.Name), ex.Message);
                 return null;
             }
         }
@@ -1874,8 +1875,8 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (!pane.IsRemote || pane.Remote is not { } connection) return false;
         if (RemoteUnsupported.Contains(command))
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Uzak bağlantıda yapılamıyor",
-                "Bu işlem sunucudaki dosyalarda desteklenmiyor. Dosyaları önce karşı panele indirin (F5).");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Uzak bağlantıda yapılamıyor"),
+                Loc.T("Bu işlem sunucudaki dosyalarda desteklenmiyor. Dosyaları önce karşı panele indirin (F5)."));
             return true;
         }
 
@@ -1888,23 +1889,23 @@ public sealed partial class MainWindow : Window, IPaneHost
                     return true;
                 case PaneCommand.OpenInVsCode when target is { IsDirectory: false, RemotePath: not null }:
                     VsCode.Open(await RemoteFiles.DownloadToTempAsync(connection, target.RemotePath, target.Name, CancellationToken.None));
-                    pane.ShowStatus("Salt okunur yerel kopya VS Code'da açıldı; değişiklikler sunucuya gönderilmez.");
+                    pane.ShowStatus(Loc.T("Salt okunur yerel kopya VS Code'da açıldı; değişiklikler sunucuya gönderilmez."));
                     return true;
                 case PaneCommand.OpenInVsCode:
-                    await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Uzak klasör",
-                        "Sunucudaki klasörler VS Code'da açılamıyor. VS Code'un Remote - SSH eklentisini kullanabilir ya da klasörü önce indirebilirsiniz.");
+                    await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Uzak klasör"),
+                        Loc.T("Sunucudaki klasörler VS Code'da açılamıyor. VS Code'un Remote - SSH eklentisini kullanabilir ya da klasörü önce indirebilirsiniz."));
                     return true;
                 case PaneCommand.Edit when target is { IsDirectory: false, RemotePath: not null }:
                     ShellActions.EditInNotepad(await RemoteFiles.DownloadToTempAsync(connection, target.RemotePath, target.Name, CancellationToken.None));
-                    pane.ShowStatus("Salt okunur yerel kopya açıldı; değişiklikler sunucuya gönderilmez.");
+                    pane.ShowStatus(Loc.T("Salt okunur yerel kopya açıldı; değişiklikler sunucuya gönderilmez."));
                     return true;
                 case PaneCommand.Rename when target is { RemotePath: not null }:
                 {
-                    var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "Yeniden adlandır", target.Name, "Adlandır", selectStem: !target.IsDirectory);
+                    var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, Loc.T("Yeniden adlandır"), target.Name, Loc.T("Adlandır"), selectStem: !target.IsDirectory);
                     if (name is null || name == target.Name) return true;
                     if (name.Contains('/'))
                     {
-                        await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Geçersiz ad", "Ad \"/\" içeremez.");
+                        await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Geçersiz ad"), Loc.T("Ad \"/\" içeremez."));
                         return true;
                     }
                     var session = await ConnectRemoteAsync(connection);
@@ -1916,7 +1917,7 @@ public sealed partial class MainWindow : Window, IPaneHost
                 }
                 case PaneCommand.NewFolder:
                 {
-                    var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, "Yeni klasör", "Yeni klasör", "Oluştur");
+                    var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, Loc.T("Yeni klasör"), Loc.T("Yeni klasör"), Loc.T("Oluştur"));
                     if (name is null) return true;
                     var session = await ConnectRemoteAsync(connection);
                     if (session is null) return true;
@@ -1927,17 +1928,17 @@ public sealed partial class MainWindow : Window, IPaneHost
                 }
                 case PaneCommand.Delete when selection.Count > 0:
                 {
-                    var subject = selection.Count == 1 ? $"\"{selection[0].Name}\"" : $"{selection.Count} öğe";
-                    if (!await Dialogs.ConfirmDangerAsync(Content.XamlRoot, DialogTheme, $"{subject} sunucudan silinsin mi?",
-                            "Sunucudaki dosyalar Geri Dönüşüm Kutusu'na gitmez; silinen klasörler içerikleriyle birlikte kalıcı olarak kaldırılır.",
-                            "Kalıcı olarak sil")) return true;
+                    var subject = selection.Count == 1 ? $"\"{selection[0].Name}\"" : Loc.F("{0} öğe", selection.Count);
+                    if (!await Dialogs.ConfirmDangerAsync(Content.XamlRoot, DialogTheme, Loc.F("{0} sunucudan silinsin mi?", subject),
+                            Loc.T("Sunucudaki dosyalar Geri Dönüşüm Kutusu'na gitmez; silinen klasörler içerikleriyle birlikte kalıcı olarak kaldırılır."),
+                            Loc.T("Kalıcı olarak sil"))) return true;
                     var session = await ConnectRemoteAsync(connection);
                     if (session is null) return true;
                     int done = 0;
                     var errors = new List<string>();
                     foreach (var item in selection.Where(i => i.RemotePath is not null))
                     {
-                        pane.ShowStatus($"Siliniyor: {item.Name}");
+                        pane.ShowStatus(Loc.F("Siliniyor: {0}", item.Name));
                         try
                         {
                             await session.DeleteAsync(item.RemotePath!, item.IsDirectory, CancellationToken.None);
@@ -1950,7 +1951,7 @@ public sealed partial class MainWindow : Window, IPaneHost
                     }
                     pane.Refresh();
                     if (errors.Count > 0)
-                        await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, $"{done} öğe silindi, {errors.Count} hata", string.Join("\n", errors.Take(10)));
+                        await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.F("{0} öğe silindi, {1} hata", done, errors.Count), string.Join("\n", errors.Take(10)));
                     return true;
                 }
                 case PaneCommand.Paste:
@@ -1960,8 +1961,8 @@ public sealed partial class MainWindow : Window, IPaneHost
                 {
                     var subject = target;
                     string text = subject is null
-                        ? $"{connection.KindLabel} · {connection.Host}:{connection.EffectivePort}\nKlasör: {pane.RemoteDir}\nKullanıcı: {(connection.User.Length > 0 ? connection.User : "—")}"
-                        : $"{(subject.IsDirectory ? "Klasör" : subject.SizeText)}\nDeğiştirilme: {subject.ModifiedText}\nYol: {subject.RemotePath}\nSunucu: {connection.Name} ({connection.KindLabel})";
+                        ? Loc.F("{0} · {1}:{2}\nKlasör: {3}\nKullanıcı: {4}", connection.KindLabel, connection.Host, connection.EffectivePort, pane.RemoteDir, (connection.User.Length > 0 ? connection.User : "—"))
+                        : Loc.F("{0}\nDeğiştirilme: {1}\nYol: {2}\nSunucu: {3} ({4})", (subject.IsDirectory ? Loc.T("Klasör") : subject.SizeText), subject.ModifiedText, subject.RemotePath, connection.Name, connection.KindLabel);
                     await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, subject?.Name ?? connection.Name, text);
                     return true;
                 }
@@ -1971,8 +1972,8 @@ public sealed partial class MainWindow : Window, IPaneHost
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            CrashLog.Write("Uzak işlem", ex);
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "İşlem tamamlanamadı", ex.Message);
+            CrashLog.Write(Loc.T("Uzak işlem"), ex);
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("İşlem tamamlanamadı"), ex.Message);
             return true;
         }
     }
@@ -1982,19 +1983,19 @@ public sealed partial class MainWindow : Window, IPaneHost
     {
         if (source.IsRemote && target.IsRemote)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Desteklenmiyor",
-                "İki sunucu arasında doğrudan aktarım yapılamıyor. Önce yerel bir klasöre indirin.");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Desteklenmiyor"),
+                Loc.T("İki sunucu arasında doğrudan aktarım yapılamıyor. Önce yerel bir klasöre indirin."));
             return;
         }
         if (source.IsInArchive || target.IsInArchive)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Desteklenmiyor",
-                "Arşiv ile sunucu arasında doğrudan aktarım yapılamıyor. Önce bir klasöre çıkarın.");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Desteklenmiyor"),
+                Loc.T("Arşiv ile sunucu arasında doğrudan aktarım yapılamıyor. Önce bir klasöre çıkarın."));
             return;
         }
         if (target.IsDriveList)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Hedef seçilmedi", "Karşı panelde bir klasör açın.");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Hedef seçilmedi"), Loc.T("Karşı panelde bir klasör açın."));
             return;
         }
 
@@ -2005,7 +2006,7 @@ public sealed partial class MainWindow : Window, IPaneHost
             if (uris.Count == 0) return;
             TransferManager.Current.EnqueueRemote(move ? TransferKind.Move : TransferKind.Copy, uris, target.CurrentPath,
                 _settings.DefaultConflictPolicy, source.Remote, null);
-            source.ShowStatus($"{uris.Count} öğe indirme kuyruğunda");
+            source.ShowStatus(Loc.F("{0} öğe indirme kuyruğunda", uris.Count));
         }
         else
         {
@@ -2021,7 +2022,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (local.Count == 0) return;
         TransferManager.Current.EnqueueRemote(move ? TransferKind.Move : TransferKind.Copy, local,
             RemotePath.ToUri(connection, target.RemoteDir), _settings.DefaultConflictPolicy, null, connection);
-        target.ShowStatus($"{local.Count} öğe yükleme kuyruğunda");
+        target.ShowStatus(Loc.F("{0} öğe yükleme kuyruğunda", local.Count));
     }
 
     // ================================================================ Yerleşim
@@ -2089,12 +2090,12 @@ public sealed partial class MainWindow : Window, IPaneHost
         }
 
         var suggested = Path.GetFileName(ShellNew.UniquePath(Path.Combine(pane.CurrentPath, entry.BaseName + entry.Extension)));
-        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, $"Yeni {entry.DisplayName}", suggested, "Oluştur", selectStem: true);
+        var name = await Dialogs.InputAsync(Content.XamlRoot, DialogTheme, Loc.F("Yeni {0}", entry.DisplayName), suggested, Loc.T("Oluştur"), selectStem: true);
         if (name is null) return;
         if (!name.EndsWith(entry.Extension, StringComparison.OrdinalIgnoreCase)) name += entry.Extension;
         if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Geçersiz ad", "Ad şu karakterleri içeremez: \\ / : * ? \" < > |");
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Geçersiz ad"), Loc.T("Ad şu karakterleri içeremez: \\ / : * ? \" < > |"));
             return;
         }
 
@@ -2106,7 +2107,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         }
         catch (Exception ex)
         {
-            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, "Dosya oluşturulamadı", ex.Message);
+            await Dialogs.MessageAsync(Content.XamlRoot, DialogTheme, Loc.T("Dosya oluşturulamadı"), ex.Message);
         }
     }
 
@@ -2119,25 +2120,25 @@ public sealed partial class MainWindow : Window, IPaneHost
             // Kilitliyken tepsiden yalnızca açma ve çıkış.
             return new List<TrayMenuItem>
             {
-                new("Zero File Commander'ı aç", ShowFromTray, IsDefault: true),
+                new(Loc.T("Zero File Commander'ı aç"), ShowFromTray, IsDefault: true),
                 TrayMenuItem.Separator,
-                new("Çıkış", ExitApplication),
+                new(Loc.T("Çıkış"), ExitApplication),
             };
         }
         var items = new List<TrayMenuItem>
         {
-            new("Zero File Commander'ı aç", ShowFromTray, IsDefault: true),
+            new(Loc.T("Zero File Commander'ı aç"), ShowFromTray, IsDefault: true),
         };
         if (_settings.DownloadsEnabled)
         {
             int active = DownloadManager.Current.ActiveCount;
-            items.Add(new(active > 0 ? $"İndirmeler ({active} sürüyor)" : "İndirmeler", ShowDownloads));
+            items.Add(new(active > 0 ? Loc.F("İndirmeler ({0} sürüyor)", active) : Loc.T("İndirmeler"), ShowDownloads));
         }
         items.Add(TrayMenuItem.Separator);
-        items.Add(new("Ayarlar", () => { ShowFromTray(); _ = ShowSettingsAsync(); }));
-        items.Add(new("Kapatınca arka planda çalış", () => _settings.RunInBackground = !_settings.RunInBackground, IsChecked: _settings.RunInBackground));
+        items.Add(new(Loc.T("Ayarlar"), () => { ShowFromTray(); _ = ShowSettingsAsync(); }));
+        items.Add(new(Loc.T("Kapatınca arka planda çalış"), () => _settings.RunInBackground = !_settings.RunInBackground, IsChecked: _settings.RunInBackground));
         items.Add(TrayMenuItem.Separator);
-        items.Add(new("Çıkış", ExitApplication));
+        items.Add(new(Loc.T("Çıkış"), ExitApplication));
         return items;
     }
 
@@ -2169,7 +2170,7 @@ public sealed partial class MainWindow : Window, IPaneHost
         if (!_trayHintShown)
         {
             _trayHintShown = true;
-            Notifier.Show("Arka planda çalışıyor", "Zero File Commander sistem tepsisinde. Tekrar açmak için simgesine tıkla.", "");
+            Notifier.Show(Loc.T("Arka planda çalışıyor"), Loc.T("Zero File Commander sistem tepsisinde. Tekrar açmak için simgesine tıkla."), "");
         }
     }
 
@@ -2204,6 +2205,17 @@ public sealed partial class MainWindow : Window, IPaneHost
         {
             HideToTray();
         }
+    }
+
+    /// <summary>Dil gibi açılışta uygulanan ayarlar için: oturumu kaydedip uygulamayı yeniden açar.</summary>
+    public void RestartApplication()
+    {
+        SaveSession();
+        RemoteSessions.CloseAll();
+        _tray?.Dispose();
+        var reason = Microsoft.Windows.AppLifecycle.AppInstance.Restart(string.Empty);
+        // Buraya yalnızca yeniden başlatma başarısız olursa gelinir.
+        CrashLog.Write("Yeniden başlatılamadı: " + reason, new InvalidOperationException(reason.ToString()));
     }
 
     private void ExitApplication()

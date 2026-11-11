@@ -153,7 +153,7 @@ public static class Notifier
             BorderThickness = new Thickness(0),
             VerticalAlignment = VerticalAlignment.Top,
         };
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(close, "Kapat");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(close, Loc.T("Kapat"));
         close.Click += (_, _) => Close(window);
         Grid.SetColumn(close, 2);
         grid.Children.Add(close);

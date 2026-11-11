@@ -25,6 +25,7 @@ public sealed partial class ShelfWindow : Window
     public ShelfWindow()
     {
         InitializeComponent();
+        Loc.Apply(this); // XAML metinleri seçili dile
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarArea);
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
@@ -100,7 +101,7 @@ public sealed partial class ShelfWindow : Window
     {
         EmptyHint.Visibility = Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         long bytes = Items.Where(i => !i.IsDirectory).Sum(i => i.Size ?? 0);
-        CountText.Text = Items.Count == 0 ? string.Empty : $"{Items.Count} öğe · {FileItem.FormatSize(bytes)}";
+        CountText.Text = Items.Count == 0 ? string.Empty : Loc.F("{0} öğe · {1}", Items.Count, FileItem.FormatSize(bytes));
     }
 
     private void Root_DragOver(object sender, DragEventArgs e)
@@ -112,7 +113,7 @@ public sealed partial class ShelfWindow : Window
         }
         // Rafa koymak dosyayı taşımaz, yalnızca hatırlar.
         e.AcceptedOperation = DataPackageOperation.Link | DataPackageOperation.Copy;
-        e.DragUIOverride.Caption = "Rafa koy";
+        e.DragUIOverride.Caption = Loc.T("Rafa koy");
         DropHint.Visibility = Visibility.Visible;
     }
 

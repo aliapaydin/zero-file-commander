@@ -79,7 +79,7 @@ public static class NotebookReader
                             if (data.TryGetProperty("text/plain", out _))
                                 outputs.Add(new NotebookOutput(Limit(Text(data, "text/plain")), null, false));
                             else if (data.TryGetProperty("text/html", out _))
-                                outputs.Add(new NotebookOutput("‹HTML çıktısı (tablo/grafik) önizlemede gösterilmiyor›", null, false));
+                                outputs.Add(new NotebookOutput(Loc.T("‹HTML çıktısı (tablo/grafik) önizlemede gösterilmiyor›"), null, false));
                             break;
                     }
                 }

@@ -1,3 +1,4 @@
+using ZeroFileCommander.Services;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -47,7 +48,7 @@ public sealed partial class PaneSplitter : Grid
                 _line.Fill = b;
         };
         Children.Add(_line);
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(this, "Panel ayırıcı");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(this, Loc.T("Panel ayırıcı"));
 
         PointerEntered += HandlePointerEntered;
         PointerExited += HandlePointerExited;

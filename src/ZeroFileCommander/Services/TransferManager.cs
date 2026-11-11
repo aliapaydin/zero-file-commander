@@ -83,10 +83,10 @@ public sealed class TransferJob : INotifyPropertyChanged
     {
         get
         {
-            string what = Sources.Count == 1 ? Path.GetFileName(Sources[0].TrimEnd('\\')) : $"{Sources.Count} öğe";
-            string verb = SourceConnection is not null ? (Kind == TransferKind.Copy ? "İndiriliyor" : "İndirilip taşınıyor")
-                : TargetConnection is not null ? (Kind == TransferKind.Copy ? "Yükleniyor" : "Yüklenip taşınıyor")
-                : Kind == TransferKind.Copy ? "Kopyalanıyor" : "Taşınıyor";
+            string what = Sources.Count == 1 ? Path.GetFileName(Sources[0].TrimEnd('\\')) : Loc.F("{0} öğe", Sources.Count);
+            string verb = SourceConnection is not null ? (Kind == TransferKind.Copy ? Loc.T("İndiriliyor") : Loc.T("İndirilip taşınıyor"))
+                : TargetConnection is not null ? (Kind == TransferKind.Copy ? Loc.T("Yükleniyor") : Loc.T("Yüklenip taşınıyor"))
+                : Kind == TransferKind.Copy ? Loc.T("Kopyalanıyor") : Loc.T("Taşınıyor");
             return $"{verb}: {what}";
         }
     }
@@ -112,14 +112,14 @@ public sealed class TransferJob : INotifyPropertyChanged
 
     public string StatusText => State switch
     {
-        TransferState.Queued => "Sırada",
-        TransferState.Scanning => "Hazırlanıyor…",
-        TransferState.Running => $"{FilesDone}/{FilesTotal} dosya · {Models.FileItem.FormatSize(BytesDone)} / {Models.FileItem.FormatSize(BytesTotal)} · {SpeedText} · {EtaText}",
-        TransferState.Paused => $"Duraklatıldı · {FilesDone}/{FilesTotal} dosya",
-        TransferState.WaitingForConflicts => $"{ConflictCount} dosya hedefte zaten var — ne yapılsın?",
-        TransferState.Completed => $"Tamamlandı · {FilesDone} dosya · {Models.FileItem.FormatSize(BytesDone)}",
-        TransferState.CompletedWithErrors => $"{FilesDone} dosya tamam, {ErrorCount} hata",
-        TransferState.Canceled => $"İptal edildi · {FilesDone} dosya tamamlanmıştı",
+        TransferState.Queued => Loc.T("Sırada"),
+        TransferState.Scanning => Loc.T("Hazırlanıyor…"),
+        TransferState.Running => Loc.F("{0}/{1} dosya · {2} / {3} · {4} · {5}", FilesDone, FilesTotal, Models.FileItem.FormatSize(BytesDone), Models.FileItem.FormatSize(BytesTotal), SpeedText, EtaText),
+        TransferState.Paused => Loc.F("Duraklatıldı · {0}/{1} dosya", FilesDone, FilesTotal),
+        TransferState.WaitingForConflicts => Loc.F("{0} dosya hedefte zaten var — ne yapılsın?", ConflictCount),
+        TransferState.Completed => Loc.F("Tamamlandı · {0} dosya · {1}", FilesDone, Models.FileItem.FormatSize(BytesDone)),
+        TransferState.CompletedWithErrors => Loc.F("{0} dosya tamam, {1} hata", FilesDone, ErrorCount),
+        TransferState.Canceled => Loc.F("İptal edildi · {0} dosya tamamlanmıştı", FilesDone),
         _ => string.Empty,
     };
 
@@ -442,7 +442,7 @@ public sealed partial class TransferManager
             var name = Path.GetFileName(source.TrimEnd('\\'));
             var destination = Path.Combine(job.Target, name);
             if (IsSameOrInside(job.Target, source))
-                throw new InvalidOperationException($"\"{name}\" kendi içine kopyalanamaz.");
+                throw new InvalidOperationException(Loc.F("\"{0}\" kendi içine kopyalanamaz.", name));
 
             if (Directory.Exists(source))
             {
@@ -571,7 +571,7 @@ public sealed partial class TransferManager
             }
             catch (Exception ex)
             {
-                lock (job.Errors) job.Errors.Add($"Kaynak silinemedi: {Path.GetFileName(file)}: {ex.Message}");
+                lock (job.Errors) job.Errors.Add(Loc.F("Kaynak silinemedi: {0}: {1}", Path.GetFileName(file), ex.Message));
             }
         }
         // Tamamen boşalan kaynak klasörleri kaldır (içinde kalan dosya varsa dokunma).
@@ -604,9 +604,9 @@ public sealed partial class TransferManager
     {
         if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds < 0) return "…";
         var span = TimeSpan.FromSeconds(seconds);
-        return span.TotalHours >= 1 ? $"{(int)span.TotalHours} sa {span.Minutes} dk kaldı"
-            : span.TotalMinutes >= 1 ? $"{span.Minutes} dk {span.Seconds} sn kaldı"
-            : $"{Math.Max(1, span.Seconds)} sn kaldı";
+        return span.TotalHours >= 1 ? Loc.F("{0} sa {1} dk kaldı", (int)span.TotalHours, span.Minutes)
+            : span.TotalMinutes >= 1 ? Loc.F("{0} dk {1} sn kaldı", span.Minutes, span.Seconds)
+            : Loc.F("{0} sn kaldı", Math.Max(1, span.Seconds));
     }
 
     private void RaiseProgress() => OnUi(() => ProgressChanged?.Invoke(this, EventArgs.Empty));

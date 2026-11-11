@@ -17,6 +17,7 @@ public sealed partial class BatchRenameView : UserControl
     {
         _items = items;
         InitializeComponent();
+        Loc.Apply(this); // XAML metinleri seçili dile
         _ready = true;
         Recalculate();
     }

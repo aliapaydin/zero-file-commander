@@ -61,7 +61,7 @@ public static class TabularPreview
         var records = ParseRecords(reader, delimiter, MaxRows + 1, token);
         if (records.Count == 0)
         {
-            data.Details = "Boş dosya";
+            data.Details = Loc.T("Boş dosya");
             return data;
         }
 
@@ -70,7 +70,7 @@ public static class TabularPreview
         bool hasHeader = LooksLikeHeader(records);
         for (int c = 0; c < width; c++)
         {
-            string name = hasHeader && c < header.Count && header[c].Trim().Length > 0 ? header[c].Trim() : $"Sütun {c + 1}";
+            string name = hasHeader && c < header.Count && header[c].Trim().Length > 0 ? header[c].Trim() : Loc.F("Sütun {0}", c + 1);
             data.Columns.Add(name);
         }
         foreach (var record in records.Skip(hasHeader ? 1 : 0).Take(MaxRows))
@@ -92,12 +92,12 @@ public static class TabularPreview
 
         string delimiterName = delimiter switch
         {
-            '\t' => "sekme",
-            ';' => "noktalı virgül",
-            '|' => "dikey çizgi",
-            _ => "virgül",
+            '\t' => Loc.T("sekme"),
+            ';' => Loc.T("noktalı virgül"),
+            '|' => Loc.T("dikey çizgi"),
+            _ => Loc.T("virgül"),
         };
-        data.Details = $"Ayraç: {delimiterName} · {encoding.WebName.ToUpperInvariant()}" + (hasHeader ? string.Empty : " · başlık satırı yok");
+        data.Details = Loc.F("Ayraç: {0} · {1}", delimiterName, encoding.WebName.ToUpperInvariant()) + (hasHeader ? string.Empty : Loc.T(" · başlık satırı yok"));
         return data;
     }
 
@@ -265,10 +265,10 @@ public static class TabularPreview
             else if (DateTime.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out _) ||
                      DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out _)) dates++;
         }
-        if (filled == 0) return "boş";
-        if (numbers == filled) return "sayı";
-        if (dates == filled) return "tarih";
-        return "metin";
+        if (filled == 0) return Loc.T("boş");
+        if (numbers == filled) return Loc.T("sayı");
+        if (dates == filled) return Loc.T("tarih");
+        return Loc.T("metin");
     }
 
     private static string Clean(string value)
@@ -331,8 +331,8 @@ public static class TabularPreview
             }
         }
 
-        string extra = fields.Length > MaxColumns ? $" · {fields.Length} sütundan ilk {MaxColumns}" : string.Empty;
-        data.Details = $"Parquet · {reader.RowGroupCount} satır grubu{extra}";
+        string extra = fields.Length > MaxColumns ? Loc.F(" · {0} sütundan ilk {1}", fields.Length, MaxColumns) : string.Empty;
+        data.Details = Loc.F("Parquet · {0} satır grubu{1}", reader.RowGroupCount, extra);
         return data;
     }
 
@@ -341,13 +341,13 @@ public static class TabularPreview
         var type = Nullable.GetUnderlyingType(field.ClrType) ?? field.ClrType;
         return type switch
         {
-            _ when type == typeof(string) => "metin",
-            _ when type == typeof(bool) => "mantıksal",
-            _ when type == typeof(DateTime) || type == typeof(DateTimeOffset) || type == typeof(DateOnly) => "tarih",
-            _ when type == typeof(TimeSpan) || type == typeof(TimeOnly) => "süre",
-            _ when type == typeof(byte[]) => "ikili",
-            _ when type == typeof(decimal) || type == typeof(double) || type == typeof(float) => "ondalık",
-            _ when type.IsPrimitive => "tam sayı",
+            _ when type == typeof(string) => Loc.T("metin"),
+            _ when type == typeof(bool) => Loc.T("mantıksal"),
+            _ when type == typeof(DateTime) || type == typeof(DateTimeOffset) || type == typeof(DateOnly) => Loc.T("tarih"),
+            _ when type == typeof(TimeSpan) || type == typeof(TimeOnly) => Loc.T("süre"),
+            _ when type == typeof(byte[]) => Loc.T("ikili"),
+            _ when type == typeof(decimal) || type == typeof(double) || type == typeof(float) => Loc.T("ondalık"),
+            _ when type.IsPrimitive => Loc.T("tam sayı"),
             _ => type.Name,
         };
     }
@@ -361,8 +361,8 @@ public static class TabularPreview
         double d => d.ToString("G10", CultureInfo.CurrentCulture),
         float f => f.ToString("G7", CultureInfo.CurrentCulture),
         decimal m => m.ToString(CultureInfo.CurrentCulture),
-        byte[] bytes => $"‹{bytes.Length} bayt›",
-        bool b => b ? "doğru" : "yanlış",
+        byte[] bytes => Loc.F("‹{0} bayt›", bytes.Length),
+        bool b => b ? Loc.T("doğru") : Loc.T("yanlış"),
         IFormattable f => f.ToString(null, CultureInfo.CurrentCulture),
         _ => Clean(value.ToString() ?? string.Empty),
     };
